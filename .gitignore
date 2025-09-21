@@ -427,12 +427,21 @@ models/
 *.h5
 *.joblib
 
-# Data files (add extensions you want to ignore)
-*.csv
-*.json
-*.xml
+# Data files (add specific data directories and files you want to ignore)
 data/
 datasets/
+logs/
+uploads/
+exports/
+backups/
+
+# Specific data files (only ignore data files, not config files)
+/data/*.csv
+/datasets/*.json
+/exports/*.xml
+
+# But allow important config files by being more specific
+# Don't ignore all .json files globally
 
 # Cache directories
 .cache/
