@@ -1,25 +1,28 @@
-import logo from './logo.svg';
-import './App.css';
+// File: frontend/src/App.js
+
+import React from 'react';
+// SOLUTION for #3: Import Routes and Route from react-router-dom
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+
+// Import your page components
+import Dashboard from './pages/Dashboard';
+// Import other pages as you create them
+// import Settings from './pages/Settings';
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+      <Router>
+        {/* You can wrap this in a Layout component later */}
+        <div>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            {/* Add routes for other pages here */}
+            {/* <Route path="/settings" element={<Settings />} /> */}
+          </Routes>
+        </div>
+      </Router>
   );
 }
 
+// SOLUTION for #2: Add the default export line
 export default App;

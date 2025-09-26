@@ -1,4 +1,3 @@
-import asyncio
 
 import boto3
 from app.config import settings
@@ -6,9 +5,9 @@ from botocore.exceptions import ClientError, NoCredentialsError
 
 class TestLogin :
     def __init__(self):
-        self.ACCESS_KEY = settings.AWS_ACCESS_KEY_ID
-        self.SECRET_KEY = settings.AWS_SECRET_ACCESS_KEY
-        self.REGION = settings.AWS_REGION
+        self.ACCESS_KEY = settings.YOUR_AWS_ACCESS_KEY_ID
+        self.SECRET_KEY = settings.YOUR_AWS_SECRET_ACCESS_KEY
+        self.REGION =  settings.YOUR_AWS_REGION
         if self.ACCESS_KEY and self.SECRET_KEY :
             self.client = boto3.client(
                 'ec2',
@@ -20,7 +19,7 @@ class TestLogin :
 
             self.client = boto3.client('ec2', region_name=self.REGION)
 
-    async def test_connection(self):
+    def test_connection(self):
         try:
             sts_client = boto3.client('sts',
                                       aws_access_key_id= self.ACCESS_KEY if self.ACCESS_KEY else None,
@@ -39,7 +38,27 @@ class TestLogin :
             print(f" Connection failed: {e}")
             return False
 
+    def get_ec2_instances(self):
+        try:
+            response = self.client.describe_instances()
+            instances = []
+
+            for reservation in response['Reservations']:
+                for instance in reservation['Instances']:
+                    instances.append({
+                        'id': instance['InstanceId'],
+                        'type': instance['InstanceType'],
+                        'state': instance['State']['Name']
+                    })
+            return instances
+        except NoCredentialsError:
+            print(" No credentials found. Run 'aws configure' or provide keys.")
+            return []
+
 if __name__ == "__main__":
     aws = TestLogin()
-    if asyncio.run(aws.test_connection()) :
+    if aws.test_connection() :
         print("\n" + "=" * 50)
+
+    instances = aws.get_ec2_instances()
+    print(f"Found {len(instances)} instances")

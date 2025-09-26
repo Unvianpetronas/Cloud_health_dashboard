@@ -1,7 +1,9 @@
-# backend/app/config.py
+from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
 from typing import List, Optional
+import os
 
+load_dotenv()
 
 class Settings(BaseSettings):
     # Application
@@ -10,16 +12,17 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "your-secret-key-change-in-production"
     CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
 
-    # Server Configuration (ADD THESE)
+    # Server Configuration
     HOST: str = "0.0.0.0"
     PORT: int = 8000
 
-    # AWS Configuration
-    AWS_REGION: str = "us-east-1"
-    AWS_ACCESS_KEY_ID: Optional[str] = None
-    AWS_SECRET_ACCESS_KEY: Optional[str] = None
 
-    # Database (ADD THIS - even though you're using DynamoDB)
+    # YOUR AWS credentials (for your own infrastructure like DynamoDB)
+    YOUR_AWS_REGION: str = "ap-southeast-1"
+    YOUR_AWS_ACCESS_KEY_ID: Optional[str] = None
+    YOUR_AWS_SECRET_ACCESS_KEY: Optional[str] = None
+
+
     DATABASE_URL: Optional[str] = None
 
     # DynamoDB Tables
@@ -30,6 +33,10 @@ class Settings(BaseSettings):
 
     # Redis (for caching)
     REDIS_URL: str = "redis://localhost:6379/0"
+
+    # Jwt_handler
+    JWT_SECRET_KEY: Optional[str] = None
+    ENCRYPTION_KEY: Optional[str] = None
 
     # Monitoring
     METRICS_COLLECTION_INTERVAL: int = 60  # seconds
