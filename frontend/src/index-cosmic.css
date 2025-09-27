@@ -1,0 +1,208 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Cosmic Design Tokens */
+:root {
+  --bg-0: #0b1020;
+  --bg-1: #0e1430;
+  --bg-2: #111836;
+  --txt-1: #e6e9f5;
+  --txt-2: #b7c0d9;
+  --muted: #8b93ad;
+  --pri: #3b82f6;
+  --pri-2: #60a5fa;
+  --pri-glow: rgba(59, 130, 246, 0.55);
+  --card: rgba(15, 20, 40, 0.8);
+  --border: #1f2a44;
+  --ring: #6ea8ff;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --radius: 1.25rem;
+}
+
+/* Cosmic Body Background */
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-display: swap;
+  
+  background: 
+    radial-gradient(1200px 600px at 50% -200px, rgba(59, 130, 246, 0.25), transparent 60%),
+    radial-gradient(900px 400px at 50% 0, rgba(59, 130, 246, 0.2), transparent 55%),
+    linear-gradient(180deg, var(--bg-1), var(--bg-0));
+  
+  color: var(--txt-1);
+  min-height: 100vh;
+}
+
+/* Cosmic Glassmorphism Navigation */
+.navbar {
+  position: sticky;
+  top: 0;
+  backdrop-filter: blur(12px);
+  background: rgba(15, 20, 40, 0.55);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.6rem 1rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  z-index: 50;
+}
+
+.nav-link {
+  color: var(--txt-2);
+  transition: all 0.3s ease;
+}
+
+.nav-link.active {
+  background: #151b34;
+  border-radius: 999px;
+  padding: 0.5rem 0.9rem;
+  color: var(--txt-1);
+}
+
+.nav-link:hover {
+  color: var(--txt-1);
+  transform: translateY(-1px);
+}
+
+/* Cosmic Badge */
+.badge {
+  background: rgba(59, 130, 246, 0.12);
+  color: #9ec6ff;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  backdrop-filter: blur(8px);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* Cosmic Hero Section */
+.hero {
+  padding: 8rem 0 4rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero h1 {
+  font-size: clamp(2.6rem, 5.8vw, 5rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, var(--txt-1) 0%, var(--pri-2) 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 1rem;
+}
+
+.hero p {
+  color: var(--txt-2);
+  max-width: 720px;
+  margin: 1rem auto 2rem;
+  font-size: 1.125rem;
+  line-height: 1.7;
+}
+
+/* Cosmic Buttons */
+.btn {
+  border-radius: 999px;
+  padding: 0.9rem 1.2rem;
+  border: 1px solid var(--border);
+  font-weight: 600;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary {
+  background: var(--pri);
+  color: white;
+  box-shadow: 0 10px 30px var(--pri-glow);
+  border-color: var(--pri);
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 40px var(--pri-glow);
+  background: var(--pri-2);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--txt-1);
+  border-color: var(--border);
+}
+
+.btn-ghost:hover {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: var(--pri);
+  color: var(--pri-2);
+  transform: translateY(-1px);
+}
+
+/* Cosmic Cards */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(12px);
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  outline: 1px solid rgba(110, 168, 255, 0.35);
+  transform: translateY(-2px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+}
+
+/* Cosmic Animations */
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* Section Spacing */
+section {
+  padding: 80px 0;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .hero {
+    padding: 4rem 0 2rem;
+  }
+  
+  .hero h1 {
+    font-size: clamp(2rem, 8vw, 3rem);
+  }
+  
+  section {
+    padding: 40px 0;
+  }
+}
