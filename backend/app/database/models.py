@@ -34,7 +34,7 @@ class MetricsModel(BaseModel):
                 'pk': f"{service}#{metric_name}",
                 'sk': timestamp.isoformat(),
                 'gsi1_pk': f"{metric_name}#{timestamp.isoformat()}",
-                'value': value,
+                'value': float(value),
                 'unit': unit,
                 'service': service,
                 'metric_name': metric_name,
@@ -97,7 +97,7 @@ class CostsModel(BaseModel):
             item = {
                 'pk': service,
                 'sk': f"{date}#{granularity}",
-                'cost': cost,
+                'cost': float(cost),
                 'date': date,
                 'granularity': granularity,
                 'currency': 'USD',
@@ -169,6 +169,16 @@ class SecurityFindingModel(BaseModel):
             logger.error(f"Error storing security finding: {e}")
             return False
 
+    async def get_findings_by_type(self, finding_type: str) -> List[Dict]:
+
+        try:
+            response = self.table.query(
+                KeyConditionExpression=Key('pk').eq(finding_type)
+            )
+            return response.get('Items', [])
+        except Exception as e:
+            logger.error(f"Error fetching findings: {e}")
+            return []
 
 class RecommendationModel(BaseModel):
     def __init__(self):
@@ -211,3 +221,14 @@ class RecommendationModel(BaseModel):
         except Exception as e:
             logger.error(f"Error storing recommendation: {e}")
             return None
+
+    async def get_recommendations_by_type(self, rec_type: str) -> List[Dict]:
+        try:
+            response = self.table.query(
+                KeyConditionExpression=Key('pk').eq(rec_type),
+                ScanIndexForward=False  # Latest first
+            )
+            return response.get('Items', [])
+        except Exception as e:
+            logger.error(f"Error fetching recommendations: {e}")
+            return []

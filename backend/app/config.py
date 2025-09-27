@@ -2,60 +2,135 @@ from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
 from typing import List, Optional
 import os
+import secrets
+from cryptography.fernet import Fernet
 
-load_dotenv()
+# Load environment-specific .env file
+environment = os.getenv("ENVIRONMENT", "development")
+env_file = f".env.{environment}"
+if os.path.exists(env_file):
+    load_dotenv(env_file)
+load_dotenv()  # Load .env as fallback
 
-class Settings(BaseSettings):
+
+class BaseConfig(BaseSettings):
+    """Base configuration with common settings"""
+
     # Application
     APP_NAME: str = "AWS Cloud Health Dashboard"
-    DEBUG: bool = False
-    SECRET_KEY: str = "your-secret-key-change-in-production"
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
+    VERSION: str = "1.0.0"
+    ENVIRONMENT: str = environment
 
     # Server Configuration
     HOST: str = "0.0.0.0"
     PORT: int = 8000
 
-
-    # YOUR AWS credentials (for your own infrastructure like DynamoDB)
+    # AWS Configuration (for your infrastructure)
     YOUR_AWS_REGION: str = "ap-southeast-1"
     YOUR_AWS_ACCESS_KEY_ID: Optional[str] = None
     YOUR_AWS_SECRET_ACCESS_KEY: Optional[str] = None
 
-
+    # Database
     DATABASE_URL: Optional[str] = None
 
     # DynamoDB Tables
+    DYNAMODB_TABLE_PREFIX: str = "CloudHealth"
     METRICS_TABLE: str = "CloudHealthMetrics"
     COSTS_TABLE: str = "CloudHealthCosts"
     SECURITY_TABLE: str = "SecurityFindings"
     RECOMMENDATIONS_TABLE: str = "Recommendations"
 
-    # Redis (for caching)
+    # Cache
     REDIS_URL: str = "redis://localhost:6379/0"
 
-    # Jwt_handler
-    JWT_SECRET_KEY: Optional[str] = None
-    ENCRYPTION_KEY: Optional[str] = None
-
-    # Monitoring
-    METRICS_COLLECTION_INTERVAL: int = 60  # seconds
-    LOG_LEVEL: str = "INFO"
-
-    # Cost Optimization
+    # Business Logic
+    METRICS_COLLECTION_INTERVAL: int = 60
     COST_OPTIMIZATION_ENABLED: bool = True
-    ML_MODEL_RETRAIN_INTERVAL: int = 86400  # 24 hours
-
-    # DynamoDB Settings
-    DYNAMODB_TABLE_PREFIX: str = "CloudHealth"
+    ML_MODEL_RETRAIN_INTERVAL: int = 86400
     METRICS_TTL_DAYS: int = 30
     COSTS_TTL_DAYS: int = 365
 
     class Config:
-        env_file = ".env"
-        case_sensitive = True
         env_file_encoding = 'utf-8'
-        extra = "ignore"  # ADD THIS - ignores extra fields
+        case_sensitive = True
+        extra = "ignore"
 
 
-settings = Settings()
+class DevelopmentConfig(BaseConfig):
+    """Development environment configuration"""
+    DEBUG: bool = True
+    LOG_LEVEL: str = "DEBUG"
+    CORS_ORIGINS: List[str] = [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173"
+    ]
+
+    # Auto-generate secure keys for development
+    @property
+    def JWT_SECRET_KEY(self) -> str:
+        env_key = os.getenv("JWT_SECRET_KEY")
+        if env_key:
+            return env_key
+        return "dev-jwt-secret-key-must-be-32-chars-minimum-for-security"
+
+    @property
+    def ENCRYPTION_KEY(self) -> str:
+        env_key = os.getenv("ENCRYPTION_KEY")
+        if env_key:
+            return env_key
+        # Fixed dev key for consistent development
+        return "ZmDfcTF7_60GrrY167zsiPd67pEvs0aGOv2oasOM1Pg="
+
+
+class ProductionConfig(BaseConfig):
+    """Production environment configuration"""
+    DEBUG: bool = False
+    LOG_LEVEL: str = "INFO"
+    CORS_ORIGINS: List[str] = []  # Must be set via environment
+
+    # Production requires real secrets from environment
+    JWT_SECRET_KEY: str
+    ENCRYPTION_KEY: str
+
+    # Production-specific settings
+    HTTPS_ONLY: bool = True
+    SECURE_COOKIES: bool = True
+
+
+def get_settings() -> BaseConfig:
+    env = os.getenv("ENVIRONMENT", "development").lower()
+
+    if env == "production":
+        return ProductionConfig()
+    else:
+        return DevelopmentConfig()
+
+
+def validate_settings(settings: BaseConfig):
+    errors = []
+
+    if not settings.JWT_SECRET_KEY or len(settings.JWT_SECRET_KEY) < 32:
+        errors.append("JWT_SECRET_KEY must be at least 32 characters")
+
+    if not settings.ENCRYPTION_KEY:
+        errors.append("ENCRYPTION_KEY is required")
+    else:
+        try:
+            Fernet(settings.ENCRYPTION_KEY.encode())
+        except Exception:
+            errors.append("ENCRYPTION_KEY is not a valid Fernet key")
+
+    if settings.ENVIRONMENT == "production":
+        if settings.DEBUG:
+            errors.append("DEBUG must be False in production")
+        if not settings.CORS_ORIGINS:
+            errors.append("CORS_ORIGINS must be set in production")
+
+    if errors:
+        raise ValueError(f"Configuration errors: {', '.join(errors)}")
+
+
+settings = get_settings()
+validate_settings(settings)
