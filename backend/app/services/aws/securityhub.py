@@ -23,7 +23,7 @@ class SecurityHubScanner:
 
     def _get_findings_in_one_region(self, region: str) -> List[Dict]:
         """
-        Hàm "Công nhân": Lấy tất cả Security Hub findings từ một region.
+        Hàm "worker": Lấy tất cả Security Hub findings từ một region.
         """
         try:
             client = self.client_provider.get_client("securityhub", region_name=region)
@@ -49,7 +49,7 @@ class SecurityHubScanner:
 
         all_findings = []
 
-        # 2. Gửi công nhân song song
+        # 2. Gửi worker song song
         with ThreadPoolExecutor(max_workers=len(all_regions)) as executor:
             future_to_region = {
                 executor.submit(self._get_findings_in_one_region, region): region
