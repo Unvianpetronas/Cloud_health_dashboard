@@ -1,11 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { ec2Api } from '../services/ec2Api';
 
 const useDashboardData = (timeRange = '24h') => {
   const { token, isAuthenticated } = useAuth();
   const [data, setData] = useState({
-    metrics: null,
-    costs: null,
+    // EC2 real data
+    ec2Summary: null,
+    ec2Cost: null,
+
+    // Mock data (giữ nguyên)
     performance: null,
     serviceHealth: null,
     alerts: null,
@@ -15,43 +19,8 @@ const useDashboardData = (timeRange = '24h') => {
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
 
-  // Mock data - trong thực tế sẽ fetch từ API
+  // Mock data cho các phần không phải EC2 (giữ nguyên)
   const mockData = {
-    metrics: [
-      {
-        title: "Total Monthly Cost",
-        value: "$1,847",
-        change: "8.2% from last month",
-        changeType: "negative"
-      },
-      {
-        title: "Active Resources", 
-        value: "247",
-        change: "94% healthy",
-        changeType: "positive"
-      },
-      {
-        title: "Active Alerts",
-        value: "4",
-        change: "1 critical",
-        changeType: "negative"
-      },
-      {
-        title: "Avg Response Time",
-        value: "234ms",
-        change: "12ms from avg",
-        changeType: "positive"
-      }
-    ],
-    costs: [
-      { name: 'Jan', cost: 1200, budget: 1500 },
-      { name: 'Feb', cost: 1350, budget: 1500 },
-      { name: 'Mar', cost: 1100, budget: 1500 },
-      { name: 'Apr', cost: 1400, budget: 1500 },
-      { name: 'May', cost: 1250, budget: 1500 },
-      { name: 'Jun', cost: 1600, budget: 1500 },
-      { name: 'Jul', cost: 1800, budget: 1500 }
-    ],
     performance: [
       { time: '00:00', cpu: 45, memory: 62, network: 23, storage: 78 },
       { time: '04:00', cpu: 52, memory: 58, network: 34, storage: 80 },
@@ -112,27 +81,32 @@ const useDashboardData = (timeRange = '24h') => {
     setError(null);
 
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // In real app, make actual API calls here
-      // const response = await fetch(`/api/v1/dashboard?timeRange=${timeRange}`, {
-      //   headers: {
-      //     'Authorization': `Bearer ${token}`,
-      //     'Content-Type': 'application/json'
-      //   }
-      // });
-      
-      // if (!response.ok) {
-      //   throw new Error('Failed to fetch dashboard data');
-      // }
-      
-      // const result = await response.json();
-      
-      // For now, use mock data
-      setData(mockData);
+      // Fetch REAL EC2 data
+      const [summaryResult, costResult] = await Promise.all([
+        ec2Api.getInstanceSummary(),
+        ec2Api.getCostEstimate()
+      ]);
+
+      // Check for errors
+      if (!summaryResult.success) {
+        throw new Error(summaryResult.error);
+      }
+      if (!costResult.success) {
+        throw new Error(costResult.error);
+      }
+
+      // Combine real EC2 data with mock data
+      setData({
+        ec2Summary: summaryResult.data,
+        ec2Cost: costResult.data,
+        performance: mockData.performance,
+        serviceHealth: mockData.serviceHealth,
+        alerts: mockData.alerts,
+        serviceStatus: mockData.serviceStatus
+      });
+
       setLastUpdated(new Date());
-      
+
     } catch (err) {
       setError(err.message);
       console.error('Error fetching dashboard data:', err);
@@ -141,7 +115,7 @@ const useDashboardData = (timeRange = '24h') => {
     }
   }, [isAuthenticated, token, timeRange]);
 
-  // Fetch data on mount and when dependencies change
+  // Fetch data on mount
   useEffect(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
