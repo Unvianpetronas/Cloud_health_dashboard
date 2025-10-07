@@ -1,11 +1,12 @@
-import axios from 'axios';
+import apiClient from './api';
 
 const API_BASE_URL = 'http://localhost:8000/api/v1';
+
 export const ec2Api = {
     // Scan all EC2 instances across regions
     scanAllRegions: async () => {
         try {
-            const response = await axios.get('/ec2/scan-all-regions');
+            const response = await apiClient.get('/ec2/scan-all-regions');
             return {
                 success: true,
                 data: response.data
@@ -21,7 +22,7 @@ export const ec2Api = {
     // Get running instances
     getRunningInstances: async () => {
         try {
-            const response = await axios.get('/ec2/running-instances');
+            const response = await apiClient.get('/ec2/running-instances');
             return {
                 success: true,
                 data: response.data
@@ -37,7 +38,7 @@ export const ec2Api = {
     // Get cost estimate
     getCostEstimate: async () => {
         try {
-            const response = await axios.get('/ec2/cost-estimate');
+            const response = await apiClient.get('/ec2/cost-estimate');
             return {
                 success: true,
                 data: response.data
@@ -50,10 +51,10 @@ export const ec2Api = {
         }
     },
 
-    // ADD THIS - Get instance summary
+    // Get instance summary
     getInstanceSummary: async () => {
         try {
-            const response = await axios.get('/ec2/summary');
+            const response = await apiClient.get('/ec2/summary');
             return {
                 success: true,
                 data: response.data

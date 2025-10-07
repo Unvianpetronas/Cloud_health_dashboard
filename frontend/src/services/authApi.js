@@ -1,13 +1,17 @@
-import axios from 'axios';
-
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+import apiClient from './api';
 
 const authApi = {
     login: async (credentials) => {
         try {
-            const response = await axios.post(`${API_BASE_URL}/auth/login`, {
+            // Don't use auth token for login
+            const response = await apiClient.post('/auth/login', {
                 access_key: credentials.access_key,
                 secret_key: credentials.secret_key,
+            }, {
+                // Skip auth interceptor for login
+                headers: {
+                    'Authorization': undefined
+                }
             });
 
             return {
@@ -15,9 +19,10 @@ const authApi = {
                 data: response.data,
             };
         } catch (error) {
+            console.error('Login error:', error);
             return {
                 success: false,
-                error: error.response?.data?.detail || 'Login failed',
+                error: error.response?.data?.detail || error.message || 'Login failed',
             };
         }
     },

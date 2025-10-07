@@ -5,6 +5,7 @@ export { default as Loading } from './common/Loading';
 export { default as Header } from './common/Header';
 export { default as ErrorBoundary } from './common/ErrorBoundary';
 export { default as ProtectedRoute } from './common/ProtectedRoute';
+export { default as UserMenu } from './common/UserMenu'; 
 
 // Dashboard Components
 export { default as MetricsCard } from './dashboard/MetricsCard';

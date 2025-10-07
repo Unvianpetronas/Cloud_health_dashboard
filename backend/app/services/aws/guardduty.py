@@ -1,7 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
-import boto3
 import logging
-from botocore.exceptions import ClientError
 from typing import List, Dict, Any
 from app.services.aws.client import AWSClientProvider
 
@@ -75,6 +73,7 @@ class GuardDutyScanner:
                 }
         except Exception as e:
             raise Exception(f"Error in {region}: {str(e)}")
+
 
     def get_all_findings(self, severity_filter: int = 4) -> Dict[str, Any]:
         status = self.check_all_regions_status()
@@ -173,6 +172,53 @@ class GuardDutyScanner:
         except Exception as e:
             raise Exception(f"Failed to get findings from {region}: {str(e)}")
 
+
+    def get_critical_findings(self) -> Dict[str ,Any]:
+        """get critical findings"""
+        all_findings = self.get_all_findings(severity_filter=7)
+        return {
+            'total_critical': all_findings['total_count'],
+            'findings': all_findings['findings'],
+            'enabled_regions': all_findings['enabled_regions'],
+            'by_type': self._group_by_type(all_findings['findings'])
+        }
+
+    def get_findings_sumary(self) -> Dict[str ,Any]:
+        """get findings summary"""
+        all_findings = self.get_all_findings(severity_filter=4)
+        if all_findings.get('total_count') == 0 :
+            return {
+                'total_findings': 0,
+                'critical_count': 0,
+                'high_count': 0,
+                'medium_count': 0,
+                'top_threats': [],
+                'affected_resources': 0,
+                'enabled_regions': all_findings['enabled_regions']
+            }
+        findings = all_findings['findings']
+
+        critical = sum(1 for f in findings if f['severity'] >= 7.0)
+        high = sum(1 for f in findings if 4<= f['severity'] < 7 )
+        medium = sum(1 for f in findings if f['severity'] < 4 )
+
+        type_counts = self._group_by_type(findings)
+        top_threats = sorted(type_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+
+        resource_ids = set(f['resource_id'] for f in findings if f['resource_id'] != 'Unknown')
+
+        return {
+            'total_findings': len(findings),
+            'critical_count': critical,
+            'high_count': high,
+            'medium_count': medium,
+            'top_threats': [{'type': t, 'count': c} for t, c in top_threats],
+            'affected_resources': len(resource_ids),
+            'enabled_regions': all_findings['enabled_regions'],
+            'severity_breakdown': all_findings['severity_breakdown']
+        }
+
+
     def _extract_resource_id(self, resource: Dict) -> str:
         resource_type = resource.get('ResourceType', '')
         if resource_type == 'Instance':
@@ -201,3 +247,10 @@ class GuardDutyScanner:
             breakdown[severity_label] = breakdown.get(severity_label, 0) + 1
 
         return breakdown
+
+    def _group_by_type(self, findings: List[Dict]) -> Dict[str, int]:
+        type_counts = {}
+        for finding in findings:
+            threat_type = finding.get('type', 'Unknown')
+            type_counts[threat_type] = type_counts.get(threat_type, 0) + 1
+        return type_counts
