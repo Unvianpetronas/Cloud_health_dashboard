@@ -1,4 +1,3 @@
-
 import boto3
 from app.config import settings
 from botocore.exceptions import ClientError, NoCredentialsError
