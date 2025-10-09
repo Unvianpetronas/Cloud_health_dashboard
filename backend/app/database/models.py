@@ -4,8 +4,6 @@ from typing import Dict, Optional, List
 from boto3.dynamodb.conditions import Key, Attr
 import uuid
 import logging
-
-
 from dynamodb import DynamoDBConnection
 from app.config import settings
 

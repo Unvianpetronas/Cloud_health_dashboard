@@ -3,10 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
 import time
-
+import asyncio
 from app.config import settings
-from app.api.routes import auth, ec2
+from app.api.routes import auth, ec2, guardduty
 from app.database.dynamodb import DynamoDBConnection
+from app.worker import CloudHealthWorker
 
 # Configure logging
 logging.basicConfig(
@@ -18,18 +19,19 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan manager"""
-    # Startup
+    """
+    Application lifespan manager
+    Runs startup and shutdown logic
+    """
     logger.info(f"Starting {settings.APP_NAME} v{settings.VERSION}")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
     logger.info(f"Debug mode: {settings.DEBUG}")
 
-    # Initialize database connection
+    # 1. Initialize database connection
     try:
         db = DynamoDBConnection()
         await db.test_connection()
 
-        # Create tables if they don't exist
         if settings.ENVIRONMENT == "development":
             db.create_tables()
             logger.info("DynamoDB tables created/verified")
@@ -40,10 +42,41 @@ async def lifespan(app: FastAPI):
         logger.error(f"Failed to initialize database: {e}")
         raise
 
+    # 2.Start background worker automatically
+    worker_task = None
+    try:
+        logger.info("Starting background worker...")
+        worker = CloudHealthWorker()
+
+        # Create background task
+        worker_task = asyncio.create_task(worker.start())
+        app.state.worker_task = worker_task
+
+        logger.info("Background worker started!")
+    except Exception as e:
+        logger.error(f"Warning: Could not start background worker: {e}")
+        logger.info("API will continue without background worker")
+
+    logger.info("=" * 70)
+    logger.info(f"{settings.APP_NAME} is ready!")
+    logger.info(f"API: http://localhost:{settings.PORT}")
+    logger.info(f"Worker: {'Running' if worker_task else 'Disabled'}")
+    logger.info("=" * 70)
+
     yield
 
-    # Shutdown
-    logger.info("Shutting down application")
+    logger.info("Shutting down application...")
+
+    # Cancel background worker
+    if worker_task and not worker_task.done():
+        logger.info("Stopping background worker...")
+        worker_task.cancel()
+        try:
+            await worker_task
+        except asyncio.CancelledError:
+            logger.info("Background worker stopped")
+
+    logger.info("Shutdown complete")
 
 
 # Create FastAPI app
@@ -77,7 +110,7 @@ async def add_process_time_header(request: Request, call_next):
 # Include routers
 app.include_router(auth.router, prefix="/api/v1", tags=["Authentication"])
 app.include_router(ec2.router, prefix="/api/v1", tags=["EC2"])
-app.include_router(ec2.router, prefix="/api/v1", tags=["GuardDuty"])
+app.include_router(guardduty.router, prefix="/api/v1", tags=["GuardDuty"])
 
 
 @app.get("/")
@@ -86,23 +119,27 @@ async def root():
         "app": settings.APP_NAME,
         "version": settings.VERSION,
         "environment": settings.ENVIRONMENT,
-        "status": "running"
+        "status": "running",
+        "worker": "enabled"  
     }
-
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
     try:
-        # Test database connection
         db = app.state.db
         db_healthy = await db.test_connection()
+
+        # Check if worker is running
+        worker_running = False
+        if hasattr(app.state, 'worker_task'):
+            worker_running = not app.state.worker_task.done()
 
         return {
             "status": "healthy" if db_healthy else "unhealthy",
             "version": settings.VERSION,
             "environment": settings.ENVIRONMENT,
             "database": "connected" if db_healthy else "disconnected",
+            "worker": "running" if worker_running else "stopped",  # 🆕
             "timestamp": time.time()
         }
     except Exception as e:
