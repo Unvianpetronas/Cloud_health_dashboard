@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Cloud, Eye, EyeOff, AlertCircle, Shield, Zap } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import ThemeToggle from '../components/common/ThemeToggle';
-
+import { useAuth } from '../contexts/AuthContext';
 const Login = () => {
   const { login, isAuthenticated, isLoading, error, clearError } = useAuth();
   const { isDark } = useTheme();

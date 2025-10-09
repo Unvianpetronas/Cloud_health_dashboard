@@ -1,191 +1,8 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import authApi from '../services/authApi';
 
-// Initial state
-const initialState = {
-  user: null,
-  token: null,
-  isAuthenticated: false,
-  isLoading: true,
-  error: null
-};
-
-// Action types
-const AUTH_ACTIONS = {
-  LOGIN_START: 'LOGIN_START',
-  LOGIN_SUCCESS: 'LOGIN_SUCCESS',
-  LOGIN_FAILURE: 'LOGIN_FAILURE',
-  LOGOUT: 'LOGOUT',
-  CLEAR_ERROR: 'CLEAR_ERROR',
-  SET_LOADING: 'SET_LOADING'
-};
-
-// Reducer
-const authReducer = (state, action) => {
-  switch (action.type) {
-    case AUTH_ACTIONS.LOGIN_START:
-      return {
-        ...state,
-        isLoading: true,
-        error: null
-      };
-    
-    case AUTH_ACTIONS.LOGIN_SUCCESS:
-      return {
-        ...state,
-        user: action.payload.user,
-        token: action.payload.token,
-        isAuthenticated: true,
-        isLoading: false,
-        error: null
-      };
-    
-    case AUTH_ACTIONS.LOGIN_FAILURE:
-      return {
-        ...state,
-        user: null,
-        token: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: action.payload.error
-      };
-    
-    case AUTH_ACTIONS.LOGOUT:
-      return {
-        ...state,
-        user: null,
-        token: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: null
-      };
-    
-    case AUTH_ACTIONS.CLEAR_ERROR:
-      return {
-        ...state,
-        error: null
-      };
-    
-    case AUTH_ACTIONS.SET_LOADING:
-      return {
-        ...state,
-        isLoading: action.payload
-      };
-    
-    default:
-      return state;
-  }
-};
-
-// Create context
 const AuthContext = createContext();
 
-// Auth Provider component
-export const AuthProvider = ({ children }) => {
-  const [state, dispatch] = useReducer(authReducer, initialState);
-
-  // Load token from localStorage on app start
-  useEffect(() => {
-    const loadStoredAuth = () => {
-      try {
-        const token = localStorage.getItem('aws_dashboard_token');
-        const user = localStorage.getItem('aws_dashboard_user');
-        
-        if (token && user) {
-          dispatch({
-            type: AUTH_ACTIONS.LOGIN_SUCCESS,
-            payload: {
-              token,
-              user: JSON.parse(user)
-            }
-          });
-        } else {
-          dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: false });
-        }
-      } catch (error) {
-        console.error('Error loading stored auth:', error);
-        dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: false });
-      }
-    };
-
-    loadStoredAuth();
-  }, []);
-
-  // Login function
-  const login = async (credentials) => {
-    dispatch({ type: AUTH_ACTIONS.LOGIN_START });
-    
-    try {
-      // Call API login endpoint
-      const response = await fetch('/api/v1/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(credentials)
-      });
-
-      if (!response.ok) {
-        throw new Error('Invalid credentials');
-      }
-
-      const data = await response.json();
-      
-      // Store in localStorage
-      localStorage.setItem('aws_dashboard_token', data.access_token);
-      localStorage.setItem('aws_dashboard_user', JSON.stringify({
-        accessKey: credentials.access_key,
-        // Don't store secret key for security
-        loginTime: new Date().toISOString()
-      }));
-
-      dispatch({
-        type: AUTH_ACTIONS.LOGIN_SUCCESS,
-        payload: {
-          token: data.access_token,
-          user: {
-            accessKey: credentials.access_key,
-            loginTime: new Date().toISOString()
-          }
-        }
-      });
-
-      return { success: true };
-    } catch (error) {
-      dispatch({
-        type: AUTH_ACTIONS.LOGIN_FAILURE,
-        payload: { error: error.message }
-      });
-      return { success: false, error: error.message };
-    }
-  };
-
-  // Logout function
-  const logout = () => {
-    localStorage.removeItem('aws_dashboard_token');
-    localStorage.removeItem('aws_dashboard_user');
-    dispatch({ type: AUTH_ACTIONS.LOGOUT });
-  };
-
-  // Clear error function
-  const clearError = () => {
-    dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
-  };
-
-  const value = {
-    ...state,
-    login,
-    logout,
-    clearError
-  };
-
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
-};
-
-// Custom hook to use auth context
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -194,4 +11,84 @@ export const useAuth = () => {
   return context;
 };
 
-export default AuthContext;
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Check if user is already logged in on app start
+  useEffect(() => {
+    const token = localStorage.getItem('access_token');
+    const userData = localStorage.getItem('user');
+
+    if (token && userData) {
+      setUser(JSON.parse(userData));
+      setIsAuthenticated(true);
+    }
+  }, []);
+
+  const login = async (credentials) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const result = await authApi.login(credentials);
+
+      if (result.success) {
+        const { access_token, token_type } = result.data;
+
+        localStorage.setItem('access_token', access_token);
+
+        const userData = {
+          accessKey: credentials.access_key.substring(0, 8) + '...',
+          loginTime: new Date().toISOString(),
+        };
+
+        localStorage.setItem('user', JSON.stringify(userData));
+
+        setUser(userData);
+        setIsAuthenticated(true);
+
+        return { success: true };
+      } else {
+        setError(result.error);
+        return { success: false, error: result.error };
+      }
+    } catch (error) {
+      const errorMessage = 'Network error. Please check your connection.';
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('user');
+    setUser(null);
+    setIsAuthenticated(false);
+    setError(null);
+  };
+
+  const clearError = () => {
+    setError(null);
+  };
+
+  const value = {
+    user,
+    isLoading,
+    isAuthenticated,
+    error,
+    login,
+    logout,
+    clearError,
+  };
+
+  return (
+      <AuthContext.Provider value={value}>
+        {children}
+      </AuthContext.Provider>
+  );
+};

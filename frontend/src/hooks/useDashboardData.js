@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { ec2Api } from '../services/ec2Api';
 
 const useDashboardData = (timeRange = '24h') => {
-  const { token, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [data, setData] = useState({
-    metrics: null,
-    costs: null,
+    ec2Summary: null,
+    ec2Cost: null,
     performance: null,
     serviceHealth: null,
     alerts: null,
@@ -15,43 +16,8 @@ const useDashboardData = (timeRange = '24h') => {
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
 
-  // Mock data - trong thực tế sẽ fetch từ API
+  // Mock data
   const mockData = {
-    metrics: [
-      {
-        title: "Total Monthly Cost",
-        value: "$1,847",
-        change: "8.2% from last month",
-        changeType: "negative"
-      },
-      {
-        title: "Active Resources", 
-        value: "247",
-        change: "94% healthy",
-        changeType: "positive"
-      },
-      {
-        title: "Active Alerts",
-        value: "4",
-        change: "1 critical",
-        changeType: "negative"
-      },
-      {
-        title: "Avg Response Time",
-        value: "234ms",
-        change: "12ms from avg",
-        changeType: "positive"
-      }
-    ],
-    costs: [
-      { name: 'Jan', cost: 1200, budget: 1500 },
-      { name: 'Feb', cost: 1350, budget: 1500 },
-      { name: 'Mar', cost: 1100, budget: 1500 },
-      { name: 'Apr', cost: 1400, budget: 1500 },
-      { name: 'May', cost: 1250, budget: 1500 },
-      { name: 'Jun', cost: 1600, budget: 1500 },
-      { name: 'Jul', cost: 1800, budget: 1500 }
-    ],
     performance: [
       { time: '00:00', cpu: 45, memory: 62, network: 23, storage: 78 },
       { time: '04:00', cpu: 52, memory: 58, network: 34, storage: 80 },
@@ -104,60 +70,77 @@ const useDashboardData = (timeRange = '24h') => {
   };
 
   const fetchDashboardData = useCallback(async () => {
-    if (!isAuthenticated || !token) {
+    // ✅ Only check isAuthenticated
+    if (!isAuthenticated) {
+      console.log('⚠️ Not authenticated, skipping API calls');
       return;
     }
 
+    console.log('🔄 Fetching dashboard data...');
     setLoading(true);
     setError(null);
 
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // In real app, make actual API calls here
-      // const response = await fetch(`/api/v1/dashboard?timeRange=${timeRange}`, {
-      //   headers: {
-      //     'Authorization': `Bearer ${token}`,
-      //     'Content-Type': 'application/json'
-      //   }
-      // });
-      
-      // if (!response.ok) {
-      //   throw new Error('Failed to fetch dashboard data');
-      // }
-      
-      // const result = await response.json();
-      
-      // For now, use mock data
-      setData(mockData);
+      // Fetch REAL EC2 data
+      console.log('📡 Calling EC2 APIs...');
+      const [summaryResult, costResult] = await Promise.all([
+        ec2Api.getInstanceSummary(),
+        ec2Api.getCostEstimate()
+      ]);
+
+      console.log('📊 Summary Result:', summaryResult);
+      console.log('💰 Cost Result:', costResult);
+
+      if (!summaryResult.success) {
+        throw new Error(summaryResult.error);
+      }
+      if (!costResult.success) {
+        throw new Error(costResult.error);
+      }
+
+      setData({
+        ec2Summary: summaryResult.data,
+        ec2Cost: costResult.data,
+        performance: mockData.performance,
+        serviceHealth: mockData.serviceHealth,
+        alerts: mockData.alerts,
+        serviceStatus: mockData.serviceStatus
+      });
+
       setLastUpdated(new Date());
-      
+      console.log('✅ Dashboard data loaded successfully');
+
     } catch (err) {
-      setError(err.message);
-      console.error('Error fetching dashboard data:', err);
+      const errorMessage = err.message || 'Failed to fetch dashboard data';
+      setError(errorMessage);
+      console.error('❌ Error fetching dashboard data:', err);
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, token, timeRange]);
+  }, [isAuthenticated, timeRange]); // ✅ Removed token dependency
 
-  // Fetch data on mount and when dependencies change
   useEffect(() => {
+    console.log('🎯 useDashboardData mounted, isAuthenticated:', isAuthenticated);
     fetchDashboardData();
   }, [fetchDashboardData]);
 
-  // Auto refresh every 5 minutes
   useEffect(() => {
     if (!isAuthenticated) return;
 
+    console.log('⏰ Setting up auto-refresh (5 min)');
     const interval = setInterval(() => {
+      console.log('🔄 Auto-refreshing dashboard...');
       fetchDashboardData();
-    }, 5 * 60 * 1000); // 5 minutes
+    }, 5 * 60 * 1000);
 
-    return () => clearInterval(interval);
+    return () => {
+      console.log('🛑 Cleaning up auto-refresh');
+      clearInterval(interval);
+    };
   }, [fetchDashboardData, isAuthenticated]);
 
   const refresh = useCallback(() => {
+    console.log('🔄 Manual refresh triggered');
     fetchDashboardData();
   }, [fetchDashboardData]);
 

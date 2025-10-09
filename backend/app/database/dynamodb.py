@@ -119,8 +119,6 @@ class DynamoDBConnection:
 
                 table = self.dynamodb.create_table(**aws_table_def)
                 table.wait_until_exists()
-
-                # Enable TTL if specified
                 if 'ttl_attribute' in table_definition:
                     self._enable_ttl(table_name, table_definition['ttl_attribute'])
 
