@@ -3,13 +3,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { ec2Api } from '../services/ec2Api';
 
 const useDashboardData = (timeRange = '24h') => {
-  const { token, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [data, setData] = useState({
-    // EC2 real data
     ec2Summary: null,
     ec2Cost: null,
-
-    // Mock data (giữ nguyên)
     performance: null,
     serviceHealth: null,
     alerts: null,
@@ -19,7 +16,7 @@ const useDashboardData = (timeRange = '24h') => {
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
 
-  // Mock data cho các phần không phải EC2 (giữ nguyên)
+  // Mock data
   const mockData = {
     performance: [
       { time: '00:00', cpu: 45, memory: 62, network: 23, storage: 78 },
@@ -73,21 +70,27 @@ const useDashboardData = (timeRange = '24h') => {
   };
 
   const fetchDashboardData = useCallback(async () => {
-    if (!isAuthenticated || !token) {
+    // ✅ Only check isAuthenticated
+    if (!isAuthenticated) {
+      console.log('⚠️ Not authenticated, skipping API calls');
       return;
     }
 
+    console.log('🔄 Fetching dashboard data...');
     setLoading(true);
     setError(null);
 
     try {
       // Fetch REAL EC2 data
+      console.log('📡 Calling EC2 APIs...');
       const [summaryResult, costResult] = await Promise.all([
         ec2Api.getInstanceSummary(),
         ec2Api.getCostEstimate()
       ]);
 
-      // Check for errors
+      console.log('📊 Summary Result:', summaryResult);
+      console.log('💰 Cost Result:', costResult);
+
       if (!summaryResult.success) {
         throw new Error(summaryResult.error);
       }
@@ -95,7 +98,6 @@ const useDashboardData = (timeRange = '24h') => {
         throw new Error(costResult.error);
       }
 
-      // Combine real EC2 data with mock data
       setData({
         ec2Summary: summaryResult.data,
         ec2Cost: costResult.data,
@@ -106,32 +108,39 @@ const useDashboardData = (timeRange = '24h') => {
       });
 
       setLastUpdated(new Date());
+      console.log('✅ Dashboard data loaded successfully');
 
     } catch (err) {
-      setError(err.message);
-      console.error('Error fetching dashboard data:', err);
+      const errorMessage = err.message || 'Failed to fetch dashboard data';
+      setError(errorMessage);
+      console.error('❌ Error fetching dashboard data:', err);
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, token, timeRange]);
+  }, [isAuthenticated, timeRange]); // ✅ Removed token dependency
 
-  // Fetch data on mount
   useEffect(() => {
+    console.log('🎯 useDashboardData mounted, isAuthenticated:', isAuthenticated);
     fetchDashboardData();
   }, [fetchDashboardData]);
 
-  // Auto refresh every 5 minutes
   useEffect(() => {
     if (!isAuthenticated) return;
 
+    console.log('⏰ Setting up auto-refresh (5 min)');
     const interval = setInterval(() => {
+      console.log('🔄 Auto-refreshing dashboard...');
       fetchDashboardData();
-    }, 5 * 60 * 1000); // 5 minutes
+    }, 5 * 60 * 1000);
 
-    return () => clearInterval(interval);
+    return () => {
+      console.log('🛑 Cleaning up auto-refresh');
+      clearInterval(interval);
+    };
   }, [fetchDashboardData, isAuthenticated]);
 
   const refresh = useCallback(() => {
+    console.log('🔄 Manual refresh triggered');
     fetchDashboardData();
   }, [fetchDashboardData]);
 

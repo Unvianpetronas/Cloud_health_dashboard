@@ -77,6 +77,7 @@ async def add_process_time_header(request: Request, call_next):
 # Include routers
 app.include_router(auth.router, prefix="/api/v1", tags=["Authentication"])
 app.include_router(ec2.router, prefix="/api/v1", tags=["EC2"])
+app.include_router(ec2.router, prefix="/api/v1", tags=["GuardDuty"])
 
 
 @app.get("/")
