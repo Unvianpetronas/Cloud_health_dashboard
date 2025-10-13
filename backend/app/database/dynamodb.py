@@ -1,10 +1,9 @@
-# backend/app/database/dynamodb.py
-
 import boto3
 import logging
-from typing import Dict, Any  # Added missing imports
+from typing import Dict, Any
 from botocore.exceptions import ClientError, NoCredentialsError
 from app.config import settings
+
 
 logger = logging.getLogger(__name__)
 

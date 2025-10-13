@@ -2,10 +2,9 @@ from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
 from typing import List, Optional
 import os
-import secrets
 from cryptography.fernet import Fernet
 
-# Load environment-specific .env file
+
 environment = os.getenv("ENVIRONMENT", "development")
 env_file = f".env.{environment}"
 if os.path.exists(env_file):
@@ -35,6 +34,7 @@ class BaseConfig(BaseSettings):
 
     # DynamoDB Tables
     DYNAMODB_TABLE_PREFIX: str = "CloudHealth"
+    CLIENT_TABLE: str = "CloudHealthClients"
     METRICS_TABLE: str = "CloudHealthMetrics"
     COSTS_TABLE: str = "CloudHealthCosts"
     SECURITY_TABLE: str = "SecurityFindings"
@@ -42,6 +42,11 @@ class BaseConfig(BaseSettings):
 
     # Cache
     REDIS_URL: str = "redis://localhost:6379/0"
+
+    # Multi-Tenant Settings
+    MAX_CLIENTS_PER_INSTANCE: int = 50
+    WORKER_COLLECTION_INTERVAL: int = 300  # 5 minutes
+    WORKER_COLLECTION_STAGGER_SECONDS: int = 10  # Delay between clients
 
     # Business Logic
     METRICS_COLLECTION_INTERVAL: int = 60
