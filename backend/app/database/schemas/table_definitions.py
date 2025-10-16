@@ -1,64 +1,104 @@
 
 TABLE_DEFINITIONS = [
     {
-        'TableName': 'CloudHealthMetrics',
-        'KeySchema': [
-            {'AttributeName': 'pk', 'KeyType': 'HASH'},
-            {'AttributeName': 'sk', 'KeyType': 'RANGE'}
+        "TableName": "CloudHealthClients",
+        "KeySchema": [
+            {"AttributeName": "pk", "KeyType": "HASH"},   # CLIENT#client-id
+            {"AttributeName": "sk", "KeyType": "RANGE"}   # METADATA
         ],
-        'AttributeDefinitions': [
-            {'AttributeName': 'pk', 'AttributeType': 'S'},
-            {'AttributeName': 'sk', 'AttributeType': 'S'},
-            {'AttributeName': 'gsi1_pk', 'AttributeType': 'S'}
+        "AttributeDefinitions": [
+            {"AttributeName": "pk", "AttributeType": "S"},
+            {"AttributeName": "sk", "AttributeType": "S"},
+            {"AttributeName": "aws_account_id", "AttributeType": "S"},
+             {'AttributeName': 'email', 'AttributeType': 'S'}
         ],
-        'GlobalSecondaryIndexes': [
+        "GlobalSecondaryIndexes": [
             {
-                'IndexName': 'GSI1',
+                "IndexName": "AwsAccountIdIndex",
+                "KeySchema": [
+                    {"AttributeName": "aws_account_id", "KeyType": "HASH"}
+                ],
+                "Projection": {"ProjectionType": "ALL"},
+            },
+            {
+                'IndexName': 'EmailIndex',
                 'KeySchema': [
-                    {'AttributeName': 'gsi1_pk', 'KeyType': 'HASH'},
-                    {'AttributeName': 'sk', 'KeyType': 'RANGE'}
+                    {'AttributeName': 'email', 'KeyType': 'HASH'}
                 ],
                 'Projection': {'ProjectionType': 'ALL'}
             }
         ],
-        'BillingMode': 'PAY_PER_REQUEST',
-        'ttl_attribute': 'ttl'
+        "BillingMode": "PAY_PER_REQUEST"
     },
+
     {
-        'TableName': 'CloudHealthCosts',
-        'KeySchema': [
-            {'AttributeName': 'pk', 'KeyType': 'HASH'},
-            {'AttributeName': 'sk', 'KeyType': 'RANGE'}
+        "TableName": "CloudHealthMetrics",
+        "KeySchema": [
+            {"AttributeName": "pk", "KeyType": "HASH"},
+            {"AttributeName": "sk", "KeyType": "RANGE"}
         ],
-        'AttributeDefinitions': [
-            {'AttributeName': 'pk', 'AttributeType': 'S'},
-            {'AttributeName': 'sk', 'AttributeType': 'S'}
+        "AttributeDefinitions": [
+            {"AttributeName": "pk", "AttributeType": "S"},
+            {"AttributeName": "sk", "AttributeType": "S"},
+            {"AttributeName": "gsi1_pk", "AttributeType": "S"}
         ],
-        'BillingMode': 'PAY_PER_REQUEST',
-        'ttl_attribute': 'ttl'
+        "GlobalSecondaryIndexes": [
+            {
+                "IndexName": "MetricNameIndex",
+                "KeySchema": [
+                    {"AttributeName": "gsi1_pk", "KeyType": "HASH"},
+                    {"AttributeName": "sk", "KeyType": "RANGE"}
+                ],
+                "Projection": {"ProjectionType": "ALL"}
+            }
+        ],
+        "BillingMode": "PAY_PER_REQUEST",
+        "TimeToLiveSpecification": {
+            "AttributeName": "ttl",
+            "Enabled": True
+        }
     },
+
     {
-        'TableName': 'SecurityFindings',
-        'KeySchema': [
-            {'AttributeName': 'pk', 'KeyType': 'HASH'},
-            {'AttributeName': 'sk', 'KeyType': 'RANGE'}
+        "TableName": "CloudHealthCosts",
+        "KeySchema": [
+            {"AttributeName": "pk", "KeyType": "HASH"},
+            {"AttributeName": "sk", "KeyType": "RANGE"}
         ],
-        'AttributeDefinitions': [
-            {'AttributeName': 'pk', 'AttributeType': 'S'},
-            {'AttributeName': 'sk', 'AttributeType': 'S'}
+        "AttributeDefinitions": [
+            {"AttributeName": "pk", "AttributeType": "S"},
+            {"AttributeName": "sk", "AttributeType": "S"}
         ],
-        'BillingMode': 'PAY_PER_REQUEST'
+        "BillingMode": "PAY_PER_REQUEST",
+        "TimeToLiveSpecification": {
+            "AttributeName": "ttl",
+            "Enabled": True
+        }
     },
+
     {
-        'TableName': 'Recommendations',
-        'KeySchema': [
-            {'AttributeName': 'pk', 'KeyType': 'HASH'},
-            {'AttributeName': 'sk', 'KeyType': 'RANGE'}
+        "TableName": "SecurityFindings",
+        "KeySchema": [
+            {"AttributeName": "pk", "KeyType": "HASH"},
+            {"AttributeName": "sk", "KeyType": "RANGE"}
         ],
-        'AttributeDefinitions': [
-            {'AttributeName': 'pk', 'AttributeType': 'S'},
-            {'AttributeName': 'sk', 'AttributeType': 'S'}
+        "AttributeDefinitions": [
+            {"AttributeName": "pk", "AttributeType": "S"},
+            {"AttributeName": "sk", "AttributeType": "S"}
         ],
-        'BillingMode': 'PAY_PER_REQUEST'
+        "BillingMode": "PAY_PER_REQUEST"
+    },
+
+    {
+        "TableName": "Recommendations",
+        "KeySchema": [
+            {"AttributeName": "pk", "KeyType": "HASH"},
+            {"AttributeName": "sk", "KeyType": "RANGE"}
+        ],
+        "AttributeDefinitions": [
+            {"AttributeName": "pk", "AttributeType": "S"},
+            {"AttributeName": "sk", "AttributeType": "S"}
+        ],
+        "BillingMode": "PAY_PER_REQUEST"
     }
 ]

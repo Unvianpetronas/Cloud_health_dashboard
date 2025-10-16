@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import useDashboardData from '../hooks/useDashboardData';
 import {
     LineChart, Line, AreaChart, Area, BarChart, Bar,
@@ -24,8 +24,31 @@ const AWSCloudHealthDashboard = () => {
 
     const { data, loading, error, lastUpdated, refresh } = useDashboardData(selectedTimeRange);
 
-    // ✅ FIX: Remove currentTime state that was causing issues
-    // We'll use lastUpdated from the hook instead
+    // ✅ Custom label renderer for pie chart
+    const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }) => {
+        const RADIAN = Math.PI / 180;
+        const radius = outerRadius + 35;
+        const x = cx + radius * Math.cos(-midAngle * RADIAN);
+        const y = cy + radius * Math.sin(-midAngle * RADIAN);
+        const textAnchor = x > cx ? 'start' : 'end';
+
+        return (
+            <text
+                x={x}
+                y={y}
+                fill="#e6e9f5"
+                textAnchor={textAnchor}
+                dominantBaseline="central"
+                style={{
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    textShadow: '0 2px 4px rgba(0,0,0,0.5)'
+                }}
+            >
+                {`${name} ${(percent * 100).toFixed(0)}%`}
+            </text>
+        );
+    };
 
     const handleRefresh = async () => {
         setRefreshing(true);
@@ -33,7 +56,7 @@ const AWSCloudHealthDashboard = () => {
         setRefreshing(false);
     };
 
-    // Loading state with cosmic design
+    // Loading state
     if (loading && !data.ec2Summary) {
         return (
             <div className="min-h-screen">
@@ -56,7 +79,7 @@ const AWSCloudHealthDashboard = () => {
         );
     }
 
-    // Error state with cosmic design
+    // Error state
     if (error && !data.ec2Summary) {
         return (
             <div className="min-h-screen">
@@ -187,7 +210,7 @@ const AWSCloudHealthDashboard = () => {
 
     return (
         <div className="min-h-screen">
-            {/* Cosmic Header with User Menu */}
+            {/* Cosmic Header */}
             <Header
                 title="AWS Cloud Health Dashboard"
                 onRefresh={handleRefresh}
@@ -207,18 +230,21 @@ const AWSCloudHealthDashboard = () => {
                 <section className="mb-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         {metricsData.map((metric, index) => (
-                            <Card
-                                key={index}
-                                className="p-6 animate-fade-in"
-                                style={{ animationDelay: `${index * 0.1}s` }}
-                            >
-                                <MetricsCard {...metric} />
-                            </Card>
+                            <div key={index} className="relative">
+                                <Card
+                                    className="p-6 animate-fade-in"
+                                    style={{
+                                        animationDelay: `${index * 0.1}s`,
+                                        overflow: 'visible'
+                                    }}
+                                >
+                                    <MetricsCard {...metric} />
+                                </Card>
+                            </div>
                         ))}
                     </div>
                 </section>
 
-                {/* Rest of your dashboard code stays the same... */}
                 {/* Charts Section */}
                 <section className="mb-8">
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -240,15 +266,8 @@ const AWSCloudHealthDashboard = () => {
                                         </linearGradient>
                                     </defs>
                                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(110, 168, 255, 0.1)" />
-                                    <XAxis
-                                        dataKey="name"
-                                        stroke="#8b93ad"
-                                        fontSize={12}
-                                    />
-                                    <YAxis
-                                        stroke="#8b93ad"
-                                        fontSize={12}
-                                    />
+                                    <XAxis dataKey="name" stroke="#8b93ad" fontSize={12} />
+                                    <YAxis stroke="#8b93ad" fontSize={12} />
                                     <Tooltip
                                         contentStyle={{
                                             backgroundColor: 'rgba(15, 20, 40, 0.95)',
@@ -277,28 +296,91 @@ const AWSCloudHealthDashboard = () => {
                             </ResponsiveContainer>
                         </Card>
 
-                        {/* Service Health Pie Chart */}
+                        {/* Service Health - SIDE BY SIDE (NO CLIPPING!) */}
                         <Card className="p-6 animate-slide-up" style={{ animationDelay: '0.1s' }}>
                             <h3 className="text-lg font-semibold text-cosmic-txt-1 mb-4 flex items-center">
                                 <Activity size={20} className="mr-2 text-green-400" />
                                 Service Health
                             </h3>
-                            <ResponsiveContainer width="100%" height={300}>
-                                <PieChart>
-                                    <Pie
-                                        data={serviceHealth}
-                                        cx="50%"
-                                        cy="50%"
-                                        labelLine={false}
-                                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                                        outerRadius={80}
-                                        fill="#8884d8"
-                                        dataKey="value"
-                                    >
-                                        {serviceHealth?.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={entry.color} />
-                                        ))}
-                                    </Pie>
+
+                            <div className="flex flex-col">
+                                {/* Pie Chart */}
+                                <div style={{ width: '100%', height: '180px' }}>
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie
+                                                data={serviceHealth}
+                                                cx="50%"
+                                                cy="50%"
+                                                labelLine={false}
+                                                label={({ percent }) => {
+                                                    const p = (percent * 100).toFixed(0);
+                                                    return p > 5 ? `${p}%` : '';
+                                                }}
+                                                outerRadius={70}
+                                                fill="#8884d8"
+                                                dataKey="value"
+                                            >
+                                                {serviceHealth?.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                                ))}
+                                            </Pie>
+                                            <Tooltip
+                                                contentStyle={{
+                                                    backgroundColor: 'rgba(15, 20, 40, 0.95)',
+                                                    border: '1px solid rgba(110, 168, 255, 0.3)',
+                                                    borderRadius: '0.75rem',
+                                                    color: '#e6e9f5',
+                                                    backdropFilter: 'blur(12px)'
+                                                }}
+                                            />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </div>
+
+                                {/* Legend Below */}
+                                <div className="space-y-2 mt-4">
+                                    {serviceHealth?.map((item, index) => (
+                                        <div
+                                            key={index}
+                                            className="flex items-center justify-between p-2 rounded-lg bg-cosmic-bg-2 border border-cosmic-border hover:border-blue-500/30 transition-all"
+                                        >
+                                            <div className="flex items-center space-x-2">
+                                                <div
+                                                    className="w-3 h-3 rounded-full flex-shrink-0"
+                                                    style={{
+                                                        backgroundColor: item.color,
+                                                        boxShadow: `0 0 6px ${item.color}60`
+                                                    }}
+                                                />
+                                                <span className="text-xs font-medium text-cosmic-txt-2">
+                                    {item.name}
+                                </span>
+                                            </div>
+                                            <span className="text-sm font-bold text-cosmic-txt-1">
+                                {item.value}
+                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </Card>
+                    </div>
+                </section>
+
+                {/* Regions Chart */}
+                {regionData.length > 0 && (
+                    <section className="mb-8">
+                        <Card className="p-6 animate-slide-up">
+                            <h3 className="text-lg font-semibold text-cosmic-txt-1 mb-4 flex items-center">
+                                <Cloud size={20} className="mr-2 text-blue-400" />
+                                EC2 Instances by Region
+                            </h3>
+                            <ResponsiveContainer width="100%" height={250}>
+                                <BarChart data={regionData}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(110, 168, 255, 0.1)" />
+                                    <XAxis dataKey="region" stroke="#8b93ad" fontSize={12} />
+                                    <YAxis stroke="#8b93ad" fontSize={12} />
                                     <Tooltip
                                         contentStyle={{
                                             backgroundColor: 'rgba(15, 20, 40, 0.95)',
@@ -308,13 +390,173 @@ const AWSCloudHealthDashboard = () => {
                                             backdropFilter: 'blur(12px)'
                                         }}
                                     />
-                                </PieChart>
+                                    <Bar dataKey="instances" fill="#3b82f6" radius={[8, 8, 0, 0]} />
+                                </BarChart>
                             </ResponsiveContainer>
                         </Card>
-                    </div>
+                    </section>
+                )}
+
+                {/* Performance Chart */}
+                <section className="mb-8">
+                    <Card className="p-6 animate-slide-up">
+                        <div
+                            className="flex items-center justify-between mb-4 cursor-pointer"
+                            onClick={() => setPerformanceExpanded(!performanceExpanded)}
+                        >
+                            <h3 className="text-lg font-semibold text-cosmic-txt-1 flex items-center">
+                                <Activity size={20} className="mr-2 text-orange-400" />
+                                Performance Metrics (Last 24 Hours)
+                            </h3>
+                            {performanceExpanded ?
+                                <ChevronUp size={20} className="text-cosmic-txt-2" /> :
+                                <ChevronDown size={20} className="text-cosmic-txt-2" />
+                            }
+                        </div>
+                        {performanceExpanded && (
+                            <ResponsiveContainer width="100%" height={350}>
+                                <LineChart data={performance}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(110, 168, 255, 0.1)" />
+                                    <XAxis dataKey="time" stroke="#8b93ad" fontSize={12} />
+                                    <YAxis stroke="#8b93ad" fontSize={12} />
+                                    <Tooltip
+                                        contentStyle={{
+                                            backgroundColor: 'rgba(15, 20, 40, 0.95)',
+                                            border: '1px solid rgba(110, 168, 255, 0.3)',
+                                            borderRadius: '0.75rem',
+                                            color: '#e6e9f5',
+                                            backdropFilter: 'blur(12px)'
+                                        }}
+                                    />
+                                    <Legend />
+                                    <Line type="monotone" dataKey="cpu" stroke="#ef4444" strokeWidth={2} name="CPU %" dot={{ r: 4 }} />
+                                    <Line type="monotone" dataKey="memory" stroke="#3b82f6" strokeWidth={2} name="Memory %" dot={{ r: 4 }} />
+                                    <Line type="monotone" dataKey="network" stroke="#10b981" strokeWidth={2} name="Network %" dot={{ r: 4 }} />
+                                    <Line type="monotone" dataKey="storage" stroke="#f59e0b" strokeWidth={2} name="Storage %" dot={{ r: 4 }} />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        )}
+                    </Card>
                 </section>
 
-                {/* I'll skip the rest for brevity - keep all your other sections */}
+                {/* Bottom Section: Alerts & Service Status */}
+                <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Alerts Panel */}
+                    <Card className="p-0 animate-slide-up">
+                        <div
+                            className="p-6 border-b border-cosmic-border flex justify-between items-center cursor-pointer"
+                            onClick={() => setAlertsExpanded(!alertsExpanded)}
+                        >
+                            <h3 className="text-lg font-semibold text-cosmic-txt-1 flex items-center">
+                                <AlertTriangle size={20} className="mr-2 text-red-400" />
+                                Recent Alerts
+                            </h3>
+                            {alertsExpanded ?
+                                <ChevronUp size={20} className="text-cosmic-txt-2" /> :
+                                <ChevronDown size={20} className="text-cosmic-txt-2" />
+                            }
+                        </div>
+                        {alertsExpanded && (
+                            <div className="p-4 space-y-3 max-h-96 overflow-y-auto">
+                                {alerts?.length === 0 ? (
+                                    <div className="text-center py-8 text-cosmic-txt-2">
+                                        <CheckCircle size={48} className="mx-auto mb-2 opacity-50 text-green-400" />
+                                        <p>No alerts at this time</p>
+                                    </div>
+                                ) : (
+                                    alerts?.map((alert) => (
+                                        <div
+                                            key={alert.id}
+                                            className="p-4 rounded-xl border transition-all duration-200 hover:shadow-cosmic-glow"
+                                            style={{
+                                                borderColor: getSeverityColor(alert.severity),
+                                                backgroundColor: getSeverityBg(alert.severity),
+                                                backdropFilter: 'blur(8px)'
+                                            }}
+                                        >
+                                            <div className="flex items-start space-x-3">
+                                                <AlertTriangle
+                                                    size={16}
+                                                    style={{ color: getSeverityColor(alert.severity) }}
+                                                    className="mt-0.5 flex-shrink-0"
+                                                />
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center space-x-2 mb-2">
+                                                        <span
+                                                            className="text-xs font-semibold uppercase px-2 py-1 rounded"
+                                                            style={{
+                                                                color: getSeverityColor(alert.severity),
+                                                                backgroundColor: 'rgba(15, 20, 40, 0.5)'
+                                                            }}
+                                                        >
+                                                            {alert.severity}
+                                                        </span>
+                                                        <span className="text-sm text-cosmic-txt-2">
+                                                            {alert.service} • {alert.region}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-sm text-cosmic-txt-1 mb-2 leading-relaxed">
+                                                        {alert.message}
+                                                    </p>
+                                                    <p className="text-xs text-cosmic-muted">
+                                                        {alert.timestamp}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        )}
+                    </Card>
+
+                    {/* Service Status List */}
+                    <Card className="p-6 animate-slide-up" style={{ animationDelay: '0.1s' }}>
+                        <h3 className="text-lg font-semibold text-cosmic-txt-1 mb-4 flex items-center">
+                            <Shield size={20} className="mr-2 text-blue-400" />
+                            Service Status
+                        </h3>
+                        <div className="space-y-3">
+                            {serviceStatus?.length === 0 ? (
+                                <div className="text-center py-8 text-cosmic-txt-2">
+                                    <Monitor size={48} className="mx-auto mb-2 opacity-50" />
+                                    <p>No services to display</p>
+                                </div>
+                            ) : (
+                                serviceStatus?.map((service, index) => (
+                                    <div
+                                        key={index}
+                                        className="flex items-center justify-between p-4 bg-cosmic-bg-2 rounded-xl border border-cosmic-border hover:border-blue-500/50 transition-all duration-200"
+                                    >
+                                        <div className="flex items-center space-x-3">
+                                            <div style={{ color: getStatusColor(service.status) }}>
+                                                {getStatusIcon(service.status)}
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-cosmic-txt-1">{service.name}</p>
+                                                <p className="text-sm text-cosmic-txt-2">{service.region}</p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="font-medium text-cosmic-txt-1 mb-1">
+                                                {service.instances} instances
+                                            </p>
+                                            <span
+                                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize"
+                                                style={{
+                                                    color: getStatusColor(service.status),
+                                                    backgroundColor: `${getStatusColor(service.status)}20`
+                                                }}
+                                            >
+                                                {service.status}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </Card>
+                </section>
 
                 {/* Footer Stats */}
                 <div className="mt-8 text-center">
