@@ -1,4 +1,3 @@
-# backend/app/api/routes/guardduty.py - FIXED FOR YOUR IMPLEMENTATION
 from fastapi import APIRouter, Depends, HTTPException, Query
 from app.services.aws.client import AWSClientProvider
 from app.services.aws.guardduty import GuardDutyScanner

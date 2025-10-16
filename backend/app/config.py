@@ -40,6 +40,11 @@ class BaseConfig(BaseSettings):
     SECURITY_TABLE: str = "SecurityFindings"
     RECOMMENDATIONS_TABLE: str = "Recommendations"
 
+    # SES
+    SES_SENDER_EMAIL: str = "cloudhealth.id.vn"
+    FRONTEND_URL: str = "http://localhost:3000"
+    EMAIL_VERIFICATION_EXPIRE_HOURS: int = 24
+
     # Cache
     REDIS_URL: str = "redis://localhost:6379/0"
 

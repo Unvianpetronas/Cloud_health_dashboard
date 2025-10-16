@@ -1,8 +1,11 @@
 from concurrent.futures import ThreadPoolExecutor
 import logging
 from typing import List, Dict, Any
-from app.services.aws.client import AWSClientProvider
 
+from twisted.mail.scripts.mailmail import success
+
+from app.services.aws.client import AWSClientProvider
+from app.services.email.ses_client import SESEmailService
 logger = logging.getLogger(__name__)
 
 
@@ -217,6 +220,57 @@ class GuardDutyScanner:
             'enabled_regions': all_findings['enabled_regions'],
             'severity_breakdown': all_findings['severity_breakdown']
         }
+
+    def get_critical_findings(self) -> Dict[str, Any]:
+        return {"findings": []}
+
+    async def get_critical_findings_with_alerts(
+            self,
+            recipient_email: str = None
+    ) -> Dict[str, Any]:
+        """
+        Get critical findings AND send email alerts.
+
+        Args:
+            recipient_email: Email to send alerts to (optional).
+
+        Returns:
+            A dictionary with findings and the alert status.
+        """
+        result = self.get_critical_findings()
+        findings = result.get('findings', [])
+        alerts_sent = 0
+        alerts_failed = 0
+
+        if recipient_email and findings:
+            for finding in findings[:5]:
+                success = await SESEmailService.send_critical_alert(
+                    recipient_email=recipient_email,
+                    data={
+                        'severity': finding.get('severity'),
+                        'title': finding.get('title'),
+                        'description': finding.get('description'),
+                        'service': finding.get('resource_type'),
+                        'resource_id': finding.get('resource_id'),
+                        'region': finding.get('resource_type'),
+                        'timestamp': finding.get('created_at'),
+                        'finding_id': finding.get('finding_id'),
+                    }
+                )
+
+                if success:
+                    alerts_sent += 1
+                else:
+                    alerts_failed += 1
+        return {
+            **result,
+            'alerts_sent': alerts_sent,
+            'alerts_failed': alerts_failed,
+            'recipient_email': recipient_email
+        }
+
+
+
 
 
     def _extract_resource_id(self, resource: Dict) -> str:
