@@ -2,8 +2,6 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field, EmailStr
 from typing import Optional
 import logging
-
-from app.config import settings
 from app.database.models import ClientModel
 from app.services.aws.iam import verify_aws_credentials
 from app.utils.jwt_handler import (
@@ -29,7 +27,6 @@ class TokenResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     expires_in: int
-    client_id: str
     aws_account_id: str
     is_new_account: bool
     email: Optional[str] = None
@@ -38,13 +35,6 @@ class TokenResponse(BaseModel):
 
 @router.post("/auth/login", response_model=TokenResponse)
 async def authenticate(request: AuthRequest):
-    """
-    🔐 Universal Authentication Endpoint
-
-    - Verifies AWS credentials with real AWS STS
-    - Auto-creates account if doesn't exist
-    - Returns JWT tokens for API access
-    """
     client_model = ClientModel()
 
     try:
@@ -69,11 +59,11 @@ async def authenticate(request: AuthRequest):
 
         if existing_client:
             # Existing account - login
-            client_id = existing_client['client_id']
+            client_id = existing_client['aws_account_id']
 
             # Update credentials (supports key rotation)
             await client_model.update_credentials(
-                client_id=client_id,
+                aws_account_id=aws_account_id,
                 aws_access_key=request.aws_access_key,
                 aws_secret_key=request.aws_secret_key,
                 aws_region=request.aws_region
@@ -95,8 +85,6 @@ async def authenticate(request: AuthRequest):
             # New account - auto-create
             logger.info(f"Creating account for AWS {aws_account_id}")
 
-            client_email = request.email or f"aws-{aws_account_id}@cloudhealth.local"
-
             if request.company_name:
                 client_company = request.company_name
             else:
@@ -109,7 +97,7 @@ async def authenticate(request: AuthRequest):
 
             # Create new client
             client_id = await client_model.create_client(
-                email=client_email,
+                email=request.email,
                 company_name=client_company,
                 aws_account_id=aws_account_id,
                 aws_access_key=request.aws_access_key,
@@ -123,27 +111,26 @@ async def authenticate(request: AuthRequest):
                     detail="Failed to create account"
                 )
 
-            logger.info(f"Account created: {client_id}")
+            logger.info(f"Account created: {aws_account_id}")
             is_new = True
         token_data = {
-            "sub": client_id,
+            "sub": aws_account_id,
             "aws_account_id": aws_account_id
         }
 
         access_token = create_access_token(token_data)
-        refresh_token = create_refresh_token({"sub": client_id})
+        refresh_token = create_refresh_token({"sub": aws_account_id})
 
-        logger.info(f"Tokens generated for {client_id}")
+        logger.info(f"Tokens generated for {aws_account_id}")
 
         return TokenResponse(
             access_token=access_token,
             refresh_token=refresh_token,
             token_type="bearer",
             expires_in=60 * 60,  # 60 minutes in seconds
-            client_id=client_id,
             aws_account_id=aws_account_id,
             is_new_account=is_new,
-            email=client_email if request.email else None,
+            email=request.email or None,
             company_name=client_company
         )
 
@@ -178,10 +165,8 @@ async def refresh_token_endpoint(request: dict):
                 detail="Invalid or expired refresh token"
             )
 
-        client_id = payload.get("sub")
-
-        # Get client from database
-        client = await client_model.get_client(client_id)
+        aws_account_id = payload.get("sub")
+        client = await client_model.get_client_by_aws_account_id(aws_account_id)
 
         if not client or client.get('status') != 'active':
             raise HTTPException(
@@ -192,19 +177,18 @@ async def refresh_token_endpoint(request: dict):
         aws_account_id = client.get('aws_account_id', 'unknown')
 
         token_data = {
-            "sub": client_id,
+            'sub': aws_account_id,
             "aws_account_id": aws_account_id
         }
 
         new_access_token = create_access_token(token_data)
-        new_refresh_token = create_refresh_token({"sub": client_id})
+        new_refresh_token = create_refresh_token({"sub": aws_account_id})
 
         return TokenResponse(
             access_token=new_access_token,
             refresh_token=new_refresh_token,
             token_type="bearer",
             expires_in=60 * 60,
-            client_id=client_id,
             aws_account_id=aws_account_id,
             is_new_account=False,
             email=client.get('email'),

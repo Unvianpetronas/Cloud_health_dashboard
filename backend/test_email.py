@@ -1,5 +1,3 @@
-
-
 import asyncio
 import sys
 import os
@@ -7,7 +5,7 @@ import os
 # Add backend to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from app.services.email.ses_client import email_service
+from app.services.email.ses_client import SESEmailService
 
 
 async def test_verification_email():
@@ -15,17 +13,20 @@ async def test_verification_email():
 
     print("Testing Verification Email...")
 
+    # ✅ CREATE AN INSTANCE FIRST (This was missing!)
+    email_service = SESEmailService()
+
     success = await email_service.send_verification_email(
-        recipient_email="tuanmarcus2005@gmail.com",  #
+        recipient_email="clouddashboardinc@gmail.com",  # Your email
         verification_token="test-token-abc123",
         client_name="Test Company"
     )
 
     if success:
-        print("Email sent successfully!")
-        print("Check your inbox")
+        print("✅ Email sent successfully!")
+        print("📧 Check your inbox")
     else:
-        print("Failed to send email")
+        print("❌ Failed to send email")
         print("Check that SES is set up correctly")
 
 
@@ -34,8 +35,11 @@ async def test_critical_alert():
 
     print("\nTesting Critical Alert Email...")
 
+
+    email_service = SESEmailService()
+
     success = await email_service.send_critical_alert(
-        recipient_email="tuanmarcus2005@gmail.com",
+        recipient_email="clouddashboardinc@gmail.com",
         alert_data={
             'severity': 'HIGH',
             'title': 'Unauthorized EC2 Access Detected',
@@ -43,16 +47,16 @@ async def test_critical_alert():
             'service': 'EC2',
             'resource_id': 'i-test123456',
             'region': 'ap-southeast-1',
-            'timestamp': '2025-10-13T10:30:00Z',
+            'timestamp': '2025-10-20T10:30:00Z',
             'finding_id': 'finding-test-789'
         }
     )
 
     if success:
-        print("Alert sent successfully!")
-        print("Check your inbox")
+        print("✅ Alert sent successfully!")
+        print("📧 Check your inbox")
     else:
-        print("Failed to send alert")
+        print("❌ Failed to send alert")
 
 
 async def main():

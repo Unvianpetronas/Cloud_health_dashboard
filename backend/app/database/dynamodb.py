@@ -119,26 +119,28 @@ class DynamoDBConnection:
                 table = self.dynamodb.create_table(**aws_table_def)
                 table.wait_until_exists()
                 if 'ttl_attribute' in table_definition:
-                    self._enable_ttl(table_name, table_definition['ttl_attribute'])
+                    self._enable_ttl(self.dynamodb_client)
 
                 logger.info(f"Table {table_name} created successfully")
             else:
                 logger.error(f"Error checking/creating table {table_name}: {e}")
                 raise
 
-    def _enable_ttl(self, table_name: str, ttl_attribute: str):
+    def _enable_ttl(self, dynamodb_client):
         """Enable TTL on a table"""
-        try:
-            self.dynamodb_client.update_time_to_live(
-                TableName=table_name,
-                TimeToLiveSpecification={
-                    'AttributeName': ttl_attribute,
-                    'Enabled': True
-                }
-            )
-            logger.info(f"TTL enabled on {table_name}")
-        except Exception as e:
-            logger.warning(f"Could not enable TTL on {table_name}: {e}")
+        tables_with_ttl = ["CloudHealthMetrics", "CloudHealthCosts"]
+        for table_name in tables_with_ttl:
+            try:
+                dynamodb_client.update_time_to_live(
+                    TableName=table_name,
+                    TimeToLiveSpecification={
+                        'AttributeName': 'ttl',
+                        'Enabled': True
+                    }
+                )
+                print(f"TTL enabled for {table_name}")
+            except Exception as e:
+                print(f"Error enabling TTL for {table_name}: {e}")
 
     def list_tables(self) -> list:
         """List all tables in YOUR DynamoDB account"""

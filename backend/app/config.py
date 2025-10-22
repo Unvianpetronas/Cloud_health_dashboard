@@ -34,19 +34,31 @@ class BaseConfig(BaseSettings):
 
     # DynamoDB Tables
     DYNAMODB_TABLE_PREFIX: str = "CloudHealth"
-    CLIENT_TABLE: str = "CloudHealthClients"
+    CLIENTS_TABLE: str = "CloudHealthClients"
     METRICS_TABLE: str = "CloudHealthMetrics"
     COSTS_TABLE: str = "CloudHealthCosts"
     SECURITY_TABLE: str = "SecurityFindings"
     RECOMMENDATIONS_TABLE: str = "Recommendations"
 
     # SES
-    SES_SENDER_EMAIL: str = "cloudhealth.id.vn"
+    SES_SENDER_EMAIL: str = "noreply@cloudhealthdashboard.xyz"
     FRONTEND_URL: str = "http://localhost:3000"
     EMAIL_VERIFICATION_EXPIRE_HOURS: int = 24
 
     # Cache
     REDIS_URL: str = "redis://localhost:6379/0"
+
+    #Secrets Manager
+    USE_SECRETS_MANAGER: bool = False
+
+    #Security Monitoring
+    ENABLE_RATE_LIMITING: bool = True
+    RATE_LIMIT_PER_MINUTE: int = 100
+    ENABLE_SECURITY_ALERTS: bool = True
+
+    #CloudWatch Monitoring
+    CLOUDWATCH_NAMESPACE: str = "CloudHealth"
+    ENABLE_DETAILED_MONITORING: bool = True
 
     # Multi-Tenant Settings
     MAX_CLIENTS_PER_INSTANCE: int = 50
@@ -100,7 +112,7 @@ class ProductionConfig(BaseConfig):
     LOG_LEVEL: str = "INFO"
     CORS_ORIGINS: List[str] = []  # Must be set via environment
 
-    # Production requires real secrets from environment
+    # Production requires real secrets from environm0ent
     JWT_SECRET_KEY: str
     ENCRYPTION_KEY: str
 

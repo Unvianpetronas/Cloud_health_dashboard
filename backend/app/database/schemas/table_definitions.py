@@ -53,10 +53,6 @@ TABLE_DEFINITIONS = [
             }
         ],
         "BillingMode": "PAY_PER_REQUEST",
-        "TimeToLiveSpecification": {
-            "AttributeName": "ttl",
-            "Enabled": True
-        }
     },
 
     {
@@ -70,10 +66,6 @@ TABLE_DEFINITIONS = [
             {"AttributeName": "sk", "AttributeType": "S"}
         ],
         "BillingMode": "PAY_PER_REQUEST",
-        "TimeToLiveSpecification": {
-            "AttributeName": "ttl",
-            "Enabled": True
-        }
     },
 
     {
