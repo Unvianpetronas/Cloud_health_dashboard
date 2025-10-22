@@ -8,7 +8,8 @@ from app.config import settings
 from app.api.routes import auth, ec2, guardduty, email
 from app.database.dynamodb import DynamoDBConnection
 from app.worker import CloudHealthWorker
-
+from app.scheduler.notification_scheduler import notification_scheduler
+from app.scheduler.critical_alert_monitor import critical_alert_monitor
 
 # Configure logging
 logging.basicConfig(
@@ -64,11 +65,25 @@ async def lifespan(app: FastAPI):
     logger.info(f"Database: DynamoDB ({'connected' if db else 'disconnected'})")
     logger.info(f"Worker: {'Running' if worker_task else 'Disabled'}")
     logger.info("=" * 70)
+    notification_scheduler.start(hour=8, minute=0)
+    logger.info("Daily notification scheduler started")
+
+    critical_alert_monitor.start(interval_minutes=10)  # Every 10 minutes
+    logger.info("Critical alert monitor started (every 10 minutes)")
 
     yield
 
-
     logger.info("Shutting down application")
+
+    notification_scheduler.stop()
+    logger.info("Daily summary scheduler stopped")
+
+    critical_alert_monitor.stop()
+    logger.info("Critical alert monitor stopped")
+
+    logger.info("=" * 60)
+
+
 
 
     if hasattr(app.state, 'worker_task') and app.state.worker_task:

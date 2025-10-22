@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, Optional
 from decimal import Decimal
-
+from app.services.cache.redis_client import cache
 from app.config import settings
 from app.database.models import (
     ClientModel,
@@ -43,6 +43,7 @@ class CloudHealthWorker:
 
         self.client_provider = client_provider
         self.aws_account_id = aws_account_id
+        self.cache = cache
 
         # Initialize database models
         self.client_model = ClientModel()
@@ -358,6 +359,9 @@ class CloudHealthWorker:
 
             # Update last collection timestamp
             await self.client_model.update_last_collection(self.aws_account_id)
+            self.cache.clear_pattern(f"metrics:{self.aws_account_id}:*")
+            self.cache.clear_pattern(f"client:{self.aws_account_id}:*")
+            logger.debug(f"[{self.aws_account_id}] Cache invalidated for fresh data")
 
             cycle_end = datetime.now()
             duration = (cycle_end - cycle_start).total_seconds()

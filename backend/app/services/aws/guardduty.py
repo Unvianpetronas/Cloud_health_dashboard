@@ -1,11 +1,10 @@
 from concurrent.futures import ThreadPoolExecutor
 import logging
-from typing import List, Dict, Any
-
-from twisted.mail.scripts.mailmail import success
-
+from datetime import datetime
+from typing import List, Dict, Any, Optional
 from app.services.aws.client import AWSClientProvider
 from app.services.email.ses_client import SESEmailService
+
 logger = logging.getLogger(__name__)
 
 
@@ -76,7 +75,6 @@ class GuardDutyScanner:
                 }
         except Exception as e:
             raise Exception(f"Error in {region}: {str(e)}")
-
 
     def get_all_findings(self, severity_filter: int = 4) -> Dict[str, Any]:
         status = self.check_all_regions_status()
@@ -176,8 +174,11 @@ class GuardDutyScanner:
             raise Exception(f"Failed to get findings from {region}: {str(e)}")
 
 
-    def get_critical_findings(self) -> Dict[str ,Any]:
-        """get critical findings"""
+    def get_critical_findings_for_api(self) -> Dict[str, Any]:
+        """
+        Get critical findings (for API endpoint display)
+        Returns dict with 'findings' key
+        """
         all_findings = self.get_all_findings(severity_filter=7)
         return {
             'total_critical': all_findings['total_count'],
@@ -186,43 +187,172 @@ class GuardDutyScanner:
             'by_type': self._group_by_type(all_findings['findings'])
         }
 
-    def get_findings_sumary(self) -> Dict[str ,Any]:
-        """get findings summary"""
-        all_findings = self.get_all_findings(severity_filter=4)
-        if all_findings.get('total_count') == 0 :
-            return {
-                'total_findings': 0,
-                'critical_count': 0,
-                'high_count': 0,
-                'medium_count': 0,
-                'top_threats': [],
-                'affected_resources': 0,
-                'enabled_regions': all_findings['enabled_regions']
+    def get_critical_findings(self,
+                              start_time: Optional[str] = None,
+                              end_time: Optional[str] = None,
+                              region: str = 'us-east-1') -> List[Dict]:
+        """
+        Used by CRITICAL ALERT MONITOR
+
+        Args:
+            start_time: ISO format datetime (e.g., "2025-10-20T10:00:00")
+            end_time: ISO format datetime
+            region: AWS region (default: us-east-1)
+
+        Returns:
+            List of critical findings (raw GuardDuty format)
+        """
+        try:
+            client = self.client_provider.get_client('guardduty', region_name=region)
+
+            # Get detector ID
+            detectors = client.list_detectors()
+            detector_ids = detectors.get('DetectorIds', [])
+
+            if not detector_ids:
+                logger.warning("No GuardDuty detectors found")
+                return []
+
+            detector_id = detector_ids[0]
+
+            # Build filter criteria
+            finding_criteria = {
+                'Criterion': {
+                    'severity': {
+                        'Gte': 7.0,  # Critical = 7.0 to 8.9
+                        'Lte': 8.9
+                    },
+                    'service.archived': {'Eq': ['false']}  # Only active findings
+                }
             }
-        findings = all_findings['findings']
 
-        critical = sum(1 for f in findings if f['severity'] >= 7.0)
-        high = sum(1 for f in findings if 4<= f['severity'] < 7 )
-        medium = sum(1 for f in findings if f['severity'] < 4 )
+            # Add time filter if provided
+            if start_time and end_time:
+                finding_criteria['Criterion']['updatedAt'] = {
+                    'Gte': int(datetime.fromisoformat(start_time).timestamp() * 1000),
+                    'Lte': int(datetime.fromisoformat(end_time).timestamp() * 1000)
+                }
 
-        type_counts = self._group_by_type(findings)
-        top_threats = sorted(type_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+            # List finding IDs
+            response = client.list_findings(
+                DetectorId=detector_id,
+                FindingCriteria=finding_criteria,
+                SortCriteria={
+                    'AttributeName': 'updatedAt',
+                    'OrderBy': 'DESC'
+                },
+                MaxResults=50  # Limit to recent 50
+            )
 
-        resource_ids = set(f['resource_id'] for f in findings if f['resource_id'] != 'Unknown')
+            finding_ids = response.get('FindingIds', [])
 
-        return {
-            'total_findings': len(findings),
-            'critical_count': critical,
-            'high_count': high,
-            'medium_count': medium,
-            'top_threats': [{'type': t, 'count': c} for t, c in top_threats],
-            'affected_resources': len(resource_ids),
-            'enabled_regions': all_findings['enabled_regions'],
-            'severity_breakdown': all_findings['severity_breakdown']
-        }
+            if not finding_ids:
+                return []
 
-    def get_critical_findings(self) -> Dict[str, Any]:
-        return {"findings": []}
+            # Get full finding details
+            findings_response = client.get_findings(
+                DetectorId=detector_id,
+                FindingIds=finding_ids
+            )
+
+            findings = findings_response.get('Findings', [])
+
+            logger.info(f"Found {len(findings)} critical findings in {region}")
+            return findings
+
+        except Exception as e:
+            logger.error(f"Error getting critical findings: {e}")
+            return []
+
+    def get_findings_summary(self,
+                             start_time: Optional[str] = None,
+                             end_time: Optional[str] = None,
+                             region: str = 'us-east-1') -> Dict:
+        """
+        Used by DAILY SUMMARY EMAIL
+
+        Args:
+            start_time: ISO format datetime
+            end_time: ISO format datetime
+            region: AWS region (default: us-east-1)
+
+        Returns:
+            Dictionary with counts by severity
+        """
+        try:
+            client = self.client_provider.get_client('guardduty', region_name=region)
+
+            # Get detector ID
+            detectors = client.list_detectors()
+            detector_ids = detectors.get('DetectorIds', [])
+
+            if not detector_ids:
+                logger.warning("No GuardDuty detectors found")
+                return self._empty_summary()
+
+            detector_id = detector_ids[0]
+
+            # Build filter criteria
+            finding_criteria = {
+                'Criterion': {
+                    'service.archived': {'Eq': ['false']}  # Only active findings
+                }
+            }
+
+            # Add time filter if provided
+            if start_time and end_time:
+                finding_criteria['Criterion']['updatedAt'] = {
+                    'Gte': int(datetime.fromisoformat(start_time).timestamp() * 1000),
+                    'Lte': int(datetime.fromisoformat(end_time).timestamp() * 1000)
+                }
+
+            # Get all findings in time range
+            response = client.list_findings(
+                DetectorId=detector_id,
+                FindingCriteria=finding_criteria,
+                MaxResults=100
+            )
+
+            finding_ids = response.get('FindingIds', [])
+
+            if not finding_ids:
+                return self._empty_summary()
+
+            # Get full details
+            findings_response = client.get_findings(
+                DetectorId=detector_id,
+                FindingIds=finding_ids
+            )
+
+            findings = findings_response.get('Findings', [])
+
+            # Count by severity
+            summary = {
+                'total': len(findings),
+                'critical': 0,  # 7.0 - 8.9
+                'high': 0,  # 4.0 - 6.9
+                'medium': 0,  # 2.0 - 3.9
+                'low': 0  # 0.1 - 1.9
+            }
+
+            for finding in findings:
+                severity = finding.get('Severity', 0)
+
+                if severity >= 7.0:
+                    summary['critical'] += 1
+                elif severity >= 4.0:
+                    summary['high'] += 1
+                elif severity >= 2.0:
+                    summary['medium'] += 1
+                else:
+                    summary['low'] += 1
+
+            logger.info(f"Findings summary: {summary}")
+            return summary
+
+        except Exception as e:
+            logger.error(f"Error getting findings summary: {e}")
+            return self._empty_summary()
 
     async def get_critical_findings_with_alerts(
             self,
@@ -230,6 +360,7 @@ class GuardDutyScanner:
     ) -> Dict[str, Any]:
         """
         Get critical findings AND send email alerts.
+        Used for manual alert testing from API endpoint.
 
         Args:
             recipient_email: Email to send alerts to (optional).
@@ -237,31 +368,43 @@ class GuardDutyScanner:
         Returns:
             A dictionary with findings and the alert status.
         """
-        result = self.get_critical_findings()
+        # Use the API method (returns dict)
+        result = self.get_critical_findings_for_api()
         findings = result.get('findings', [])
         alerts_sent = 0
         alerts_failed = 0
 
         if recipient_email and findings:
+            email_service = SESEmailService()
+
+            # Send alerts for first 5 critical findings
             for finding in findings[:5]:
-                success = await SESEmailService.send_critical_alert(
-                    recipient_email=recipient_email,
-                    data={
-                        'severity': finding.get('severity'),
+                try:
+                    alert_data = {
+                        'severity': 'CRITICAL',
                         'title': finding.get('title'),
                         'description': finding.get('description'),
-                        'service': finding.get('resource_type'),
+                        'service': finding.get('resource_type', 'Unknown'),
                         'resource_id': finding.get('resource_id'),
-                        'region': finding.get('resource_type'),
-                        'timestamp': finding.get('created_at'),
+                        'region': finding.get('region'),
+                        'timestamp': finding.get('updated_at'),
                         'finding_id': finding.get('finding_id'),
                     }
-                )
 
-                if success:
-                    alerts_sent += 1
-                else:
+                    success = await email_service.send_critical_alert(
+                        recipient_email=recipient_email,
+                        alert_data=alert_data
+                    )
+
+                    if success:
+                        alerts_sent += 1
+                    else:
+                        alerts_failed += 1
+
+                except Exception as e:
+                    logger.error(f"Failed to send alert: {e}")
                     alerts_failed += 1
+
         return {
             **result,
             'alerts_sent': alerts_sent,
@@ -270,11 +413,10 @@ class GuardDutyScanner:
         }
 
 
-
-
-
     def _extract_resource_id(self, resource: Dict) -> str:
+        """Extract resource ID from GuardDuty resource object"""
         resource_type = resource.get('ResourceType', '')
+
         if resource_type == 'Instance':
             return resource.get('InstanceDetails', {}).get('InstanceId', 'Unknown')
         elif resource_type == 'AccessKey':
@@ -286,15 +428,19 @@ class GuardDutyScanner:
             return 'Unknown'
 
     def _get_severity_label(self, severity: float) -> str:
+        """Convert numeric severity to label"""
         if severity >= 7.0:
-            return 'HIGH'
+            return 'CRITICAL'
         elif severity >= 4.0:
+            return 'HIGH'
+        elif severity >= 2.0:
             return 'MEDIUM'
         else:
             return 'LOW'
 
     def _calculate_severity_breakdown(self, findings: List[Dict]) -> Dict[str, int]:
-        breakdown = {'HIGH': 0, 'MEDIUM': 0, 'LOW': 0}
+        """Calculate count of findings by severity label"""
+        breakdown = {'CRITICAL': 0, 'HIGH': 0, 'MEDIUM': 0, 'LOW': 0}
 
         for finding in findings:
             severity_label = finding.get('severity_label', 'LOW')
@@ -303,8 +449,19 @@ class GuardDutyScanner:
         return breakdown
 
     def _group_by_type(self, findings: List[Dict]) -> Dict[str, int]:
+        """Group findings by threat type"""
         type_counts = {}
         for finding in findings:
             threat_type = finding.get('type', 'Unknown')
             type_counts[threat_type] = type_counts.get(threat_type, 0) + 1
         return type_counts
+
+    def _empty_summary(self) -> Dict:
+        """Return empty summary structure"""
+        return {
+            'total': 0,
+            'critical': 0,
+            'high': 0,
+            'medium': 0,
+            'low': 0
+        }

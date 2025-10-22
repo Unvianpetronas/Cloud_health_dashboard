@@ -388,3 +388,360 @@ class SESEmailService:
             return False
 
 
+    async def send_daily_summary_email(self,
+                                       recipient_email: str,
+                                       client_name: str,
+                                       summary_data: dict) -> bool:
+        """
+        Send daily security summary email
+
+        Args:
+            recipient_email: Recipient email address
+            client_name: Company/client name
+            summary_data: Dictionary with summary statistics:
+                {
+                    'total_findings': int,
+                    'critical_count': int,
+                    'high_count': int,
+                    'medium_count': int,
+                    'low_count': int,
+                    'timestamp': str,
+                    'period': str,
+                    'aws_account_id': str (optional)
+                }
+
+        Returns:
+            True if email sent successfully, False otherwise
+        """
+        try:
+            # Extract data
+            total = summary_data.get('total_findings', 0)
+            critical = summary_data.get('critical_count', 0)
+            high = summary_data.get('high_count', 0)
+            medium = summary_data.get('medium_count', 0)
+            low = summary_data.get('low_count', 0)
+            period = summary_data.get('period', '24 hours')
+            is_test = summary_data.get('is_test', False)
+
+            # Determine overall status
+            if critical > 0:
+                status_emoji = "🔴"
+                status_text = "Critical Issues Detected"
+                status_color = "#ef4444"
+            elif high > 0:
+                status_emoji = "🟠"
+                status_text = "High Priority Issues"
+                status_color = "#f59e0b"
+            elif medium > 0:
+                status_emoji = "🟡"
+                status_text = "Medium Priority Issues"
+                status_color = "#eab308"
+            elif total > 0:
+                status_emoji = "🔵"
+                status_text = "Low Priority Issues"
+                status_color = "#3b82f6"
+            else:
+                status_emoji = "✅"
+                status_text = "All Clear"
+                status_color = "#10b981"
+
+            html_body = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <style>
+                    body {{ 
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+                        background-color: #0b1020;
+                        margin: 0;
+                        padding: 20px;
+                        color: #e6e9f5;
+                    }}
+                    .container {{ 
+                        max-width: 600px;
+                        margin: 0 auto;
+                        background: linear-gradient(135deg, #0e1430 0%, #111836 100%);
+                        border-radius: 16px;
+                        overflow: hidden;
+                        border: 1px solid rgba(110, 168, 255, 0.2);
+                        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+                    }}
+                    .header {{ 
+                        background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+                        padding: 40px 30px;
+                        text-align: center;
+                    }}
+                    .header h1 {{ 
+                        color: white;
+                        margin: 0;
+                        font-size: 28px;
+                        font-weight: 700;
+                    }}
+                    .header .icon {{
+                        font-size: 56px;
+                        margin-bottom: 15px;
+                    }}
+                    .header .subtitle {{
+                        color: #dbeafe;
+                        font-size: 14px;
+                        margin-top: 10px;
+                        opacity: 0.9;
+                    }}
+                    .content {{ 
+                        padding: 40px 30px;
+                    }}
+                    .status-banner {{
+                        background: rgba(59, 130, 246, 0.1);
+                        border-left: 4px solid {status_color};
+                        padding: 20px;
+                        border-radius: 8px;
+                        margin-bottom: 30px;
+                        display: flex;
+                        align-items: center;
+                        gap: 15px;
+                    }}
+                    .status-banner .emoji {{
+                        font-size: 40px;
+                    }}
+                    .status-banner .text {{
+                        flex: 1;
+                    }}
+                    .status-banner .text h2 {{
+                        margin: 0;
+                        font-size: 20px;
+                        color: #e6e9f5;
+                    }}
+                    .status-banner .text p {{
+                        margin: 5px 0 0 0;
+                        color: #8b93ad;
+                        font-size: 14px;
+                    }}
+                    .stats-grid {{
+                        display: grid;
+                        grid-template-columns: repeat(2, 1fr);
+                        gap: 15px;
+                        margin: 30px 0;
+                    }}
+                    .stat-card {{
+                        background: rgba(30, 41, 59, 0.5);
+                        padding: 20px;
+                        border-radius: 12px;
+                        border: 1px solid rgba(110, 168, 255, 0.1);
+                        text-align: center;
+                    }}
+                    .stat-card.critical {{
+                        border-left: 3px solid #ef4444;
+                    }}
+                    .stat-card.high {{
+                        border-left: 3px solid #f59e0b;
+                    }}
+                    .stat-card.medium {{
+                        border-left: 3px solid #eab308;
+                    }}
+                    .stat-card.low {{
+                        border-left: 3px solid #3b82f6;
+                    }}
+                    .stat-card .number {{
+                        font-size: 36px;
+                        font-weight: 700;
+                        margin: 10px 0;
+                    }}
+                    .stat-card.critical .number {{ color: #ef4444; }}
+                    .stat-card.high .number {{ color: #f59e0b; }}
+                    .stat-card.medium .number {{ color: #eab308; }}
+                    .stat-card.low .number {{ color: #3b82f6; }}
+                    .stat-card .label {{
+                        font-size: 12px;
+                        color: #8b93ad;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                        font-weight: 600;
+                    }}
+                    .total-box {{
+                        background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(96, 165, 250, 0.1));
+                        border: 2px solid rgba(59, 130, 246, 0.3);
+                        padding: 25px;
+                        border-radius: 12px;
+                        text-align: center;
+                        margin: 20px 0;
+                    }}
+                    .total-box .number {{
+                        font-size: 48px;
+                        font-weight: 700;
+                        color: #60a5fa;
+                        margin: 10px 0;
+                    }}
+                    .total-box .label {{
+                        font-size: 14px;
+                        color: #b7c0d9;
+                    }}
+                    .button {{ 
+                        display: inline-block;
+                        padding: 16px 32px;
+                        background: linear-gradient(135deg, #3b82f6, #60a5fa);
+                        color: white;
+                        text-decoration: none;
+                        border-radius: 12px;
+                        font-weight: 700;
+                        font-size: 16px;
+                        margin: 20px 0;
+                        transition: transform 0.2s;
+                    }}
+                    .button:hover {{
+                        background: linear-gradient(135deg, #2563eb, #3b82f6);
+                        transform: translateY(-2px);
+                    }}
+                    .footer {{ 
+                        text-align: center;
+                        color: #8b93ad;
+                        font-size: 13px;
+                        padding: 30px;
+                        border-top: 1px solid rgba(110, 168, 255, 0.1);
+                    }}
+                    .footer p {{
+                        margin: 5px 0;
+                    }}
+                    .test-badge {{
+                        background: #f59e0b;
+                        color: white;
+                        padding: 5px 15px;
+                        border-radius: 20px;
+                        font-size: 12px;
+                        font-weight: 700;
+                        display: inline-block;
+                        margin-top: 10px;
+                    }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <div class="icon">☁️</div>
+                        <h1>Daily Security Summary</h1>
+                        <p class="subtitle">{client_name}</p>
+                        <p class="subtitle">Last {period}</p>
+                        {f'<span class="test-badge">TEST EMAIL</span>' if is_test else ''}
+                    </div>
+    
+                    <div class="content">
+                        <div class="status-banner">
+                            <div class="emoji">{status_emoji}</div>
+                            <div class="text">
+                                <h2>{status_text}</h2>
+                                <p>Security summary for the past {period}</p>
+                            </div>
+                        </div>
+    
+                        <div class="total-box">
+                            <div class="label">Total Findings</div>
+                            <div class="number">{total}</div>
+                            <div class="label">Last {period}</div>
+                        </div>
+    
+                        <div class="stats-grid">
+                            <div class="stat-card critical">
+                                <div class="label">🔴 Critical</div>
+                                <div class="number">{critical}</div>
+                            </div>
+    
+                            <div class="stat-card high">
+                                <div class="label">🟠 High</div>
+                                <div class="number">{high}</div>
+                            </div>
+    
+                            <div class="stat-card medium">
+                                <div class="label">🟡 Medium</div>
+                                <div class="number">{medium}</div>
+                            </div>
+    
+                            <div class="stat-card low">
+                                <div class="label">🔵 Low</div>
+                                <div class="number">{low}</div>
+                            </div>
+                        </div>
+    
+                        <div style="text-align: center; margin-top: 30px;">
+                            <a href="{self.frontend_url}/dashboard" class="button">
+                                🔎 View Full Dashboard
+                            </a>
+                        </div>
+    
+                        <p style="font-size: 13px; color: #8b93ad; text-align: center; margin-top: 20px;">
+                            💡 <strong>Tip:</strong> Check your dashboard regularly to stay on top of security issues
+                        </p>
+                    </div>
+    
+                    <div class="footer">
+                        <p><strong>AWS Cloud Health Dashboard</strong></p>
+                        <p>Real-time Security Monitoring</p>
+                        <p style="margin-top: 15px;">
+                            <a href="{self.frontend_url}/settings/notifications" style="color: #60a5fa; text-decoration: none;">
+                                Manage notification preferences
+                            </a>
+                        </p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """
+
+            text_body = f"""
+            AWS Cloud Health Dashboard - Daily Security Summary
+            {client_name}
+    
+            {status_text}
+            Last {period}
+    
+            TOTAL FINDINGS: {total}
+    
+            By Severity:
+            🔴 Critical: {critical}
+            🟠 High: {high}
+            🟡 Medium: {medium}
+            🔵 Low: {low}
+    
+            View your dashboard: {self.frontend_url}/dashboard
+    
+            © 2025 AWS Cloud Health Dashboard
+            """
+
+            # Send email
+            response = self.ses.send_email(
+                Source=self.sender_email,
+                Destination={'ToAddresses': [recipient_email]},
+                Message={
+                    'Subject': {
+                        'Data': f'Daily Security Summary - {client_name}',
+                        'Charset': 'UTF-8'
+                    },
+                    'Body': {
+                        'Html': {
+                            'Data': html_body,
+                            'Charset': 'UTF-8'
+                        },
+                        'Text': {
+                            'Data': text_body,
+                            'Charset': 'UTF-8'
+                        }
+                    }
+                }
+            )
+
+            logger.info(f"Daily summary email sent to {recipient_email}")
+            logger.debug(f"SES Response: {response}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to send daily summary: {e}", exc_info=True)
+            return False
+
+
+
+
+
+
+
+
+
