@@ -3,7 +3,7 @@ from app.services.aws.client import AWSClientProvider
 from app.services.aws.ec2 import EC2Scanner
 from app.api.middleware.dependency import get_aws_client_provider
 import asyncio
-from app.services.cache.redis_client import cache
+from app.services.cache_client.redis_client import cache
 import logging
 
 logger = logging.getLogger(__name__)
@@ -22,8 +22,8 @@ async def scan_all_ec2_instances(
                 logger.info("Returning cached data")
                 return {
                     **cache_data,
-                    'source' : 'cache',
-                    'cache' : True
+                    'source' : 'cache_client',
+                    'cache_client' : True
                 }
         scanner = EC2Scanner(client_provider)
         loop = asyncio.get_running_loop()
@@ -34,7 +34,7 @@ async def scan_all_ec2_instances(
         return {
             **report,
             'source' : 'aws',
-            'cache' : False
+            'cache_client' : False
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Scan error: {str(e)}")
@@ -53,8 +53,8 @@ async def get_running_instances(
                 logger.info("Returning cached data")
                 return {
                     **cache_data,
-                    'source' : 'cache',
-                    'cache' : True
+                    'source' : 'cache_client',
+                    'cache_client' : True
                 }
         scanner = EC2Scanner(client_provider)
         loop = asyncio.get_running_loop()
@@ -65,7 +65,7 @@ async def get_running_instances(
         return {
             **report,
             'source' : 'aws',
-            'cache' : False
+            'cache_client' : False
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
@@ -83,8 +83,8 @@ async def get_cost_estimate(
                 logger.info("Returning cached data")
                 return {
                     **cache_data,
-                    'source' : 'cache',
-                    'cache' : True
+                    'source' : 'cache_client',
+                    'cache_client' : True
                 }
         scanner = EC2Scanner(client_provider)
         loop = asyncio.get_running_loop()
@@ -95,7 +95,7 @@ async def get_cost_estimate(
         return {
             **report,
             'source' : 'aws',
-            'cache' : False
+            'cache_client' : False
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Cost estimate error: {str(e)}")
@@ -112,8 +112,8 @@ async def get_instance_summary(
                 logger.info("Returning cached data")
                 return {
                     **cache_data,
-                    'source' : 'cache',
-                    'cache' : True
+                    'source' : 'cache_client',
+                    'cache_client' : True
                 }
         scanner = EC2Scanner(client_provider)
         loop = asyncio.get_running_loop()
@@ -124,7 +124,7 @@ async def get_instance_summary(
         return {
             **summary,
             'source' : 'aws',
-            'cache' : False
+            'cache_client' : False
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Summary error: {str(e)}")

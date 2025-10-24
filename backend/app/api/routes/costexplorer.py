@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.services.aws.client import AWSClientProvider
 from app.services.aws.costexplorer import CostExplorerScanner
 from app.api.middleware.dependency import get_aws_client_provider
-from app.services.cache.redis_client import cache
+from app.services.cache_client.redis_client import cache
 import asyncio
 import logging
 from datetime import datetime, timedelta, UTC
@@ -27,14 +27,14 @@ async def get_total_cost(
         if not force_refresh:
             if cached := cache.get(cache_key):
                 logger.info("Returning cached total cost data")
-                return {**cached, "source": "cache", "cache": True}
+                return {**cached, "source": "cache_client", "cache_client": True}
 
         scanner = CostExplorerScanner(client_provider)
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(None, scanner.get_total_cost, start_date, end_date, granularity)
 
         cache.set(cache_key, result, ttl=300)
-        return {**result, "source": "aws", "cache": False}
+        return {**result, "source": "aws", "cache_client": False}
     except Exception as e:
         logger.exception("Error fetching total cost")
         raise HTTPException(status_code=500, detail=str(e))
@@ -56,14 +56,14 @@ async def get_cost_by_service(
         if not force_refresh:
             if cached := cache.get(cache_key):
                 logger.info("Returning cached service cost data")
-                return {**cached, "source": "cache", "cache": True}
+                return {**cached, "source": "cache_client", "cache_client": True}
 
         scanner = CostExplorerScanner(client_provider)
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(None, scanner.get_cost_by_service, start_date, end_date, granularity)
 
         cache.set(cache_key, result, ttl=300)
-        return {**result, "source": "aws", "cache": False}
+        return {**result, "source": "aws", "cache_client": False}
     except Exception as e:
         logger.exception("Error fetching cost by service")
         raise HTTPException(status_code=500, detail=str(e))
@@ -85,14 +85,14 @@ async def get_cost_by_account(
         if not force_refresh:
             if cached := cache.get(cache_key):
                 logger.info("Returning cached account cost data")
-                return {**cached, "source": "cache", "cache": True}
+                return {**cached, "source": "cache_client", "cache_client": True}
 
         scanner = CostExplorerScanner(client_provider)
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(None, scanner.get_cost_by_account, start_date, end_date, granularity)
 
         cache.set(cache_key, result, ttl=300)
-        return {**result, "source": "aws", "cache": False}
+        return {**result, "source": "aws", "cache_client": False}
     except Exception as e:
         logger.exception("Error fetching cost by account")
         raise HTTPException(status_code=500, detail=str(e))
@@ -113,14 +113,14 @@ async def get_cost_forecast(
         if not force_refresh:
             if cached := cache.get(cache_key):
                 logger.info("Returning cached cost forecast")
-                return {**cached, "source": "cache", "cache": True}
+                return {**cached, "source": "cache_client", "cache_client": True}
 
         scanner = CostExplorerScanner(client_provider)
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(None, scanner.get_cost_forecast, days_ahead, metric)
 
         cache.set(cache_key, result, ttl=300)
-        return {**result, "source": "aws", "cache": False}
+        return {**result, "source": "aws", "cache_client": False}
     except Exception as e:
         logger.exception("Error fetching cost forecast")
         raise HTTPException(status_code=500, detail=str(e))
@@ -140,14 +140,14 @@ async def get_rightsizing_recommendations(
         if not force_refresh:
             if cached := cache.get(cache_key):
                 logger.info("Returning cached rightsizing data")
-                return {**cached, "source": "cache", "cache": True}
+                return {**cached, "source": "cache_client", "cache_client": True}
 
         scanner = CostExplorerScanner(client_provider)
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(None, scanner.get_rightsizing_recommendations, service)
 
         cache.set(cache_key, result, ttl=600)
-        return {**result, "source": "aws", "cache": False}
+        return {**result, "source": "aws", "cache_client": False}
     except Exception as e:
         logger.exception("Error fetching rightsizing recommendations")
         raise HTTPException(status_code=500, detail=str(e))
@@ -169,7 +169,7 @@ async def get_cost_summary(
         if not force_refresh:
             if cache_data := cache.get(cache_key):
                 logger.info("Returning cached cost summary data")
-                return {**cache_data, "source": "cache", "cache": True}
+                return {**cache_data, "source": "cache_client", "cache_client": True}
 
         scanner = CostExplorerScanner(client_provider)
         loop = asyncio.get_running_loop()
@@ -192,7 +192,7 @@ async def get_cost_summary(
         }
 
         cache.set(cache_key, summary, ttl=300)
-        return {**summary, "source": "aws", "cache": False}
+        return {**summary, "source": "aws", "cache_client": False}
     except Exception as e:
         logger.exception("Error fetching cost summary")
         raise HTTPException(status_code=500, detail=f"CostExplorer summary error: {str(e)}")

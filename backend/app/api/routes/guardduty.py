@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.services.aws.client import AWSClientProvider
 from app.services.aws.guardduty import GuardDutyScanner
 from app.api.middleware.dependency import get_aws_client_provider
-from app.services.cache.redis_client import cache
+from app.services.cache_client.redis_client import cache
 import asyncio
 import logging
 
@@ -121,6 +121,6 @@ async def get_findings_summary(
 async def clear_cache_guardduty():
     try:
         cache.clear_pattern("guardduty:*")
-        return {"status": "success", "message": "GuardDuty cache cleared"}
+        return {"status": "success", "message": "GuardDuty cache_client cleared"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
