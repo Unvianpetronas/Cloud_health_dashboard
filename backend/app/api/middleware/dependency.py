@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
-def get_aws_client_provider(token: str = Depends(oauth2_scheme)) -> AWSClientProvider:
+async def get_aws_client_provider(token: str = Depends(oauth2_scheme)) -> AWSClientProvider:
     """
     Đây là một dependency:
     1. Yêu cầu và xác thực JWT token.
@@ -26,15 +26,41 @@ def get_aws_client_provider(token: str = Depends(oauth2_scheme)) -> AWSClientPro
     payload = decode_access_token(token)
     if payload is None:
         raise credentials_exception
-    encrypted_creds = payload.get("encrypted_creds")
-    if encrypted_creds is None:
+    aws_account_id = payload.get("aws_account_id") or payload.get("sub")
+    if aws_account_id is None:
         raise credentials_exception
     try:
-        access_key, secret_key = decrypt_credentials(encrypted_creds)
-    except ValueError:
-        raise credentials_exception
+        # Import here to avoid circular imports
+        from app.database.models import ClientModel
 
-    return AWSClientProvider(access_key=access_key, secret_key=secret_key)
+        # Fetch client from database
+        client_model = ClientModel()
+        client = await client_model.get_client_by_aws_account_id(aws_account_id)
+
+        if not client:
+            logger.warning(f"Client not found: {aws_account_id}")
+            raise credentials_exception
+
+        # Check status
+        if client.get('status') != 'active':
+            logger.warning(f"Client inactive: {aws_account_id}")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Account is {client.get('status')}"
+            )
+
+        # Create AWS client provider with decrypted credentials
+        return AWSClientProvider(
+            access_key=client['aws_access_key'],
+            secret_key=client['aws_secret_key'],
+            region=client.get('aws_region', 'us-east-1')
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in auth dependency: {e}", exc_info=True)
+        raise credentials_exception
 
 
 def get_current_client_id(token: str = Depends(oauth2_scheme)) -> str:

@@ -5,8 +5,8 @@ const authApi = {
         try {
             // Don't use auth token for login
             const response = await apiClient.post('/auth/login', {
-                access_key: credentials.access_key,
-                secret_key: credentials.secret_key,
+                aws_access_key: credentials.aws_access_key,
+                aws_secret_key: credentials.aws_secret_key,
             }, {
                 // Skip auth interceptor for login
                 headers: {

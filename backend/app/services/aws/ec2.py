@@ -2,13 +2,15 @@ from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Any
 from .client import AWSClientProvider
+from .base_scanner import BaseAWSScanner
+from botocore.exceptions import ClientError
 import logging
 
 
 logger =logging.getLogger(__name__)
 
 
-class EC2Scanner:
+class EC2Scanner(BaseAWSScanner):
 
     def __init__(self, client_provider: AWSClientProvider):
         """
@@ -19,6 +21,7 @@ class EC2Scanner:
         """
         self.client_provider = client_provider
 
+    @BaseAWSScanner.with_retry()
     def _get_instances_in_one_region(self, region: str) -> List[Dict]:
         """
         Hàm "Công nhân": Lấy tất cả các máy chủ trong một khu vực duy nhất.
@@ -36,6 +39,7 @@ class EC2Scanner:
         except Exception:
             return []
 
+    @BaseAWSScanner.with_retry()
     def scan_all_regions(self) -> Dict:
         """
         Hàm "Quản lý": Điều phối việc quét song song trên tất cả các khu vực.
@@ -78,7 +82,7 @@ class EC2Scanner:
             "has_instances": True
         }
 
-
+    @BaseAWSScanner.with_retry()
     def Scan_specific_region(self,region: str) -> Dict[str, Any]:
         instances = self._get_instances_in_one_region(region)
         return {
@@ -223,7 +227,7 @@ class EC2Scanner:
             logger.warning(f"Could not get actual usage for {instance_id}: {e}")
             return 730
 
-
+    @BaseAWSScanner.with_retry()
     def get_instance_summary(self) -> Dict[str, Any]:
         all_data = self.scan_all_regions()
         instances = all_data['instances']

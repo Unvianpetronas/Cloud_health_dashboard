@@ -70,7 +70,7 @@ class ClientModel(BaseModel):
                 'pk': f"CLIENT#{aws_account_id}",
                 'sk': 'METADATA',
                 'aws_account_id': aws_account_id,
-                'email': email.lower(),
+                'email': email,
                 'company_name': company_name,
                 'aws_access_key_encrypted': encrypted_access,
                 'aws_secret_key_encrypted': encrypted_secret,

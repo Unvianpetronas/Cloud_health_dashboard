@@ -238,10 +238,10 @@ class CloudHealthWorker:
             if not critical_findings:
                 return
 
-            from app.services.email.ses_client import email_service
+            from app.services.email.ses_client import SESEmailService
 
             for finding in critical_findings:
-                await email_service.send_critical_alert(
+                await SESEmailService.send_critical_alert(
                     recipient_email=client['email'],
                     alert_data={
                         'severity': finding['severity_label'],

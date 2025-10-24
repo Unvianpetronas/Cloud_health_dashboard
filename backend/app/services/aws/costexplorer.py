@@ -1,9 +1,10 @@
 from typing import Dict, List
 from datetime import datetime, timedelta, UTC
 from .client import AWSClientProvider
+from botocore.exceptions import ClientError
+from base_scanner import BaseAWSScanner
 
-
-class CostExplorerScanner:
+class CostExplorerScanner(BaseAWSScanner):
     """
     Wrapper cho AWS Cost Explorer.
     Cho phép query cost theo service, account, forecast và rightsizing recommendations.
@@ -23,6 +24,7 @@ class CostExplorerScanner:
         )
         return response
 
+    @BaseAWSScanner.with_retry()
     def get_cost_by_service(self, start_date: str, end_date: str, granularity: str = "MONTHLY") -> Dict:
         """
         Chi phí theo từng service (DynamoDB, EC2, S3, CloudWatch, v.v...).
@@ -35,6 +37,7 @@ class CostExplorerScanner:
         )
         return response
 
+    @BaseAWSScanner.with_retry()
     def get_cost_by_account(self, start_date: str, end_date: str, granularity: str = "MONTHLY") -> Dict:
         """
         Chi phí theo từng AWS account.
@@ -47,6 +50,7 @@ class CostExplorerScanner:
         )
         return response
 
+    @BaseAWSScanner.with_retry()
     def get_cost_forecast(self, days_ahead: int = 30, metric: str = "UNBLENDED_COST") -> Dict:
         """
         Dự báo chi phí cho X ngày tới.
@@ -61,6 +65,7 @@ class CostExplorerScanner:
         )
         return response
 
+    @BaseAWSScanner.with_retry()
     def get_rightsizing_recommendations(self, service: str = "AmazonEC2") -> Dict:
         """
         Gợi ý rightsizing cho service (mặc định: EC2).

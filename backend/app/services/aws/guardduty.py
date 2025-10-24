@@ -4,14 +4,15 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 from app.services.aws.client import AWSClientProvider
 from app.services.email.ses_client import SESEmailService
-
+from base_scanner import BaseAWSScanner
 logger = logging.getLogger(__name__)
 
 
-class GuardDutyScanner:
+class GuardDutyScanner(BaseAWSScanner):
     def __init__(self, client_provider: AWSClientProvider):
         self.client_provider = client_provider
 
+    @BaseAWSScanner.with_retry()
     def get_all_regions(self) -> List[str]:
         try:
             ec2_client = self.client_provider.get_client('ec2', region_name='us-east-1')
@@ -21,6 +22,7 @@ class GuardDutyScanner:
             logger.error(f"Error getting regions: {e}")
             return ['us-east-1', 'us-west-2', 'eu-west-1']
 
+    @BaseAWSScanner.with_retry()
     def check_all_regions_status(self) -> Dict[str, Any]:
         all_regions = self.get_all_regions()
         status_by_region = {}
@@ -57,6 +59,7 @@ class GuardDutyScanner:
             }
         }
 
+    @BaseAWSScanner.with_retry()
     def _check_region(self, region: str) -> Dict[str, Any]:
         try:
             client = self.client_provider.get_client('guardduty', region_name=region)
@@ -76,6 +79,7 @@ class GuardDutyScanner:
         except Exception as e:
             raise Exception(f"Error in {region}: {str(e)}")
 
+    @BaseAWSScanner.with_retry()
     def get_all_findings(self, severity_filter: int = 4) -> Dict[str, Any]:
         status = self.check_all_regions_status()
         enabled_regions = status['enabled_regions']
@@ -121,6 +125,7 @@ class GuardDutyScanner:
             'severity_breakdown': self._calculate_severity_breakdown(all_findings)
         }
 
+    @BaseAWSScanner.with_retry()
     def _get_findings_from_region(self, region: str, severity_filter: int) -> List[Dict]:
         try:
             client = self.client_provider.get_client('guardduty', region_name=region)
@@ -173,7 +178,7 @@ class GuardDutyScanner:
         except Exception as e:
             raise Exception(f"Failed to get findings from {region}: {str(e)}")
 
-
+    @BaseAWSScanner.with_retry()
     def get_critical_findings_for_api(self) -> Dict[str, Any]:
         """
         Get critical findings (for API endpoint display)
@@ -187,6 +192,7 @@ class GuardDutyScanner:
             'by_type': self._group_by_type(all_findings['findings'])
         }
 
+    @BaseAWSScanner.with_retry()
     def get_critical_findings(self,
                               start_time: Optional[str] = None,
                               end_time: Optional[str] = None,
@@ -264,6 +270,7 @@ class GuardDutyScanner:
             logger.error(f"Error getting critical findings: {e}")
             return []
 
+    @BaseAWSScanner.with_retry()
     def get_findings_summary(self,
                              start_time: Optional[str] = None,
                              end_time: Optional[str] = None,
@@ -354,6 +361,7 @@ class GuardDutyScanner:
             logger.error(f"Error getting findings summary: {e}")
             return self._empty_summary()
 
+    @BaseAWSScanner.with_retry()
     async def get_critical_findings_with_alerts(
             self,
             recipient_email: str = None

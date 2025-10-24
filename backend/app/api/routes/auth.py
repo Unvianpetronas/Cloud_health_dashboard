@@ -95,9 +95,15 @@ async def authenticate(request: AuthRequest):
                 else:
                     client_company = f"AWS Account {aws_account_id}"
 
+            if request.email:
+                client_email = request.email
+            else:
+                client_email = f"{aws_account_id}@cloudhealth.com"
+
+
             # Create new client
             client_id = await client_model.create_client(
-                email=request.email,
+                email=client_email,
                 company_name=client_company,
                 aws_account_id=aws_account_id,
                 aws_access_key=request.aws_access_key,
