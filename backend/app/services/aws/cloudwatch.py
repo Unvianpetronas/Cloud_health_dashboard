@@ -4,10 +4,11 @@ from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
 from botocore.exceptions import ClientError
 from .client import AWSClientProvider
+from base_scanner import BaseAWSScanner
 
 logger = logging.getLogger(__name__)
 
-class CloudWatchScanner:
+class CloudWatchScanner(BaseAWSScanner):
     """
     Một class đơn giản để lấy metrics từ AWS CloudWatch.
     Nó có thể quét song song nhiều region để thu thập dữ liệu nhanh hơn.
@@ -22,6 +23,7 @@ class CloudWatchScanner:
         """
         self.client_provider = client_provider
 
+    @BaseAWSScanner.with_retry()
     def _get_metric_data_in_one_region(
             self,
             region: str,
@@ -60,6 +62,7 @@ class CloudWatchScanner:
             logger.error(f"Lỗi không xác định ở region {region}: {e}")
             return {"region": region, "datapoints": [], "label": metric_name}
 
+    @BaseAWSScanner.with_retry()
     def scan_all_regions(
             self,
             namespace: str,

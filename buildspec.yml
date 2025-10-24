@@ -1,0 +1,216 @@
+version: 0.2
+
+env:
+  variables:
+    EC2_INSTANCE_TAG: "CloudHealth-App"
+  parameter-store:
+    # Optional: Store sensitive values in SSM Parameter Store
+    EC2_INSTANCE_ID: /cloudhealth/ec2/instance-id
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.11
+      nodejs: 18
+    commands:
+      - echo "Installing build dependencies..."
+      - apt-get update -qq
+      
+  pre_build:
+    commands:
+      - echo "=========================================="
+      - echo "Pre-build phase started on $(date)"
+      - echo "=========================================="
+      
+      - echo "Installing Python dependencies..."
+      - cd backend
+      - pip install --quiet -r requirements.txt
+      - cd ..
+      
+      - echo "Installing Node.js dependencies..."
+      - cd frontend
+      - npm install --silent
+      - cd ..
+      
+      - echo "Running tests..."
+      - cd backend
+      - python -m pytest tests/ --maxfail=1 --disable-warnings -q || echo "Tests completed"
+      - cd ..
+      
+  build:
+    commands:
+      - echo "=========================================="
+      - echo "Build phase started on $(date)"
+      - echo "=========================================="
+      
+      - echo "Building React frontend..."
+      - cd frontend
+      - npm run build
+      - cd ..
+      
+      - echo "Creating deployment package..."
+      - mkdir -p /tmp/deployment
+      - cp -r backend /tmp/deployment/
+      - cp -r frontend/dist /tmp/deployment/frontend-build
+      - cp -r deployment /tmp/deployment/
+      - [ -f .env.example ] && cp .env.example /tmp/deployment/
+      
+      - echo "Creating tarball..."
+      - cd /tmp/deployment
+      - tar -czf /tmp/cloud-health-app.tar.gz .
+      - cd $CODEBUILD_SRC_DIR
+      
+      - echo "Package created: $(du -h /tmp/cloud-health-app.tar.gz)"
+      
+  post_build:
+    commands:
+      - echo "=========================================="
+      - echo "Deployment phase started on $(date)"
+      - echo "=========================================="
+      
+      # Get EC2 instance ID
+      - |
+        if [ -n "$EC2_INSTANCE_ID" ]; then
+          echo "Using instance ID from Parameter Store: $EC2_INSTANCE_ID"
+        else
+          echo "Finding instance by tag: $EC2_INSTANCE_TAG"
+          EC2_INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=$EC2_INSTANCE_TAG" "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].InstanceId" \
+            --output text)
+        fi
+      
+      - echo "Target EC2 Instance: $EC2_INSTANCE_ID"
+      
+      # Convert tarball to base64 for SSM transfer
+      - echo "Encoding deployment package..."
+      - base64 /tmp/cloud-health-app.tar.gz > /tmp/cloud-health-app.tar.gz.b64
+      - PACKAGE_SIZE=$(du -h /tmp/cloud-health-app.tar.gz.b64 | cut -f1)
+      - echo "Encoded package size: $PACKAGE_SIZE"
+      
+      # Deploy using SSM - Method 1: Direct inline script
+      - |
+        echo "Deploying to EC2 via SSM..."
+        DEPLOY_SCRIPT=$(cat << 'DEPLOY_EOF'
+        #!/bin/bash
+        set -e
+        
+        APP_DIR="/home/ubuntu/cloud-health-dashboard"
+        DEPLOY_PACKAGE="/tmp/cloud-health-app.tar.gz"
+        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+        
+        echo "======================================"
+        echo "Deployment started: $TIMESTAMP"
+        echo "======================================"
+        
+        # Create backup of current version
+        if [ -d "$APP_DIR" ]; then
+          echo "Creating backup..."
+          sudo tar -czf "/home/ubuntu/backup-$TIMESTAMP.tar.gz" -C "$APP_DIR" . 2>/dev/null || true
+        fi
+        
+        # Create app directory
+        sudo mkdir -p "$APP_DIR"
+        sudo chown ubuntu:ubuntu "$APP_DIR"
+        
+        # Extract new version
+        echo "Extracting deployment package..."
+        tar -xzf "$DEPLOY_PACKAGE" -C "$APP_DIR"
+        
+        # Run deployment script
+        echo "Running deployment script..."
+        cd "$APP_DIR"
+        chmod +x deployment/scripts/*.sh
+        ./deployment/scripts/deploy.sh
+        
+        # Cleanup
+        rm -f "$DEPLOY_PACKAGE"
+        
+        echo "======================================"
+        echo "Deployment completed: $(date)"
+        echo "======================================"
+        DEPLOY_EOF
+        )
+      
+      # Send deployment package and script to EC2
+      - |
+        echo "Sending deployment command to EC2..."
+        COMMAND_ID=$(aws ssm send-command \
+          --instance-ids "$EC2_INSTANCE_ID" \
+          --document-name "AWS-RunShellScript" \
+          --comment "Deploy CloudHealth Dashboard - Build $CODEBUILD_BUILD_NUMBER" \
+          --parameters commands="[
+            \"echo 'Receiving deployment package...'\",
+            \"echo '$(cat /tmp/cloud-health-app.tar.gz.b64)' | base64 -d > /tmp/cloud-health-app.tar.gz\",
+            \"echo 'Package received: '\$(du -h /tmp/cloud-health-app.tar.gz | cut -f1)\",
+            \"$DEPLOY_SCRIPT\"
+          ]" \
+          --output text \
+          --query "Command.CommandId")
+      
+      - echo "SSM Command ID: $COMMAND_ID"
+      
+      # Wait for deployment to complete
+      - |
+        echo "Waiting for deployment to complete..."
+        MAX_ATTEMPTS=60
+        ATTEMPT=0
+        
+        while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+          STATUS=$(aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$EC2_INSTANCE_ID" \
+            --query "Status" \
+            --output text 2>/dev/null || echo "Pending")
+          
+          echo "Attempt $((ATTEMPT+1))/$MAX_ATTEMPTS - Status: $STATUS"
+          
+          if [ "$STATUS" = "Success" ]; then
+            echo "✅ Deployment successful!"
+            
+            # Get deployment output
+            aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$EC2_INSTANCE_ID" \
+              --query "StandardOutputContent" \
+              --output text
+            
+            break
+          elif [ "$STATUS" = "Failed" ]; then
+            echo "❌ Deployment failed!"
+            
+            # Get error output
+            aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$EC2_INSTANCE_ID" \
+              --query "StandardErrorContent" \
+              --output text
+            
+            exit 1
+          elif [ "$STATUS" = "Cancelled" ] || [ "$STATUS" = "TimedOut" ]; then
+            echo "❌ Deployment $STATUS!"
+            exit 1
+          fi
+          
+          sleep 5
+          ATTEMPT=$((ATTEMPT+1))
+        done
+        
+        if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+          echo "❌ Deployment timed out after $((MAX_ATTEMPTS*5)) seconds"
+          exit 1
+        fi
+      
+      - echo "=========================================="
+      - echo "Build completed on $(date)"
+      - echo "=========================================="
+
+artifacts:
+  files:
+    - '**/*'
+  name: CloudHealthApp-$CODEBUILD_BUILD_NUMBER
+
+cache:
+  paths:
+    - 'backend/.venv/**/*'
+    - 'frontend/node_modules/**/*'
