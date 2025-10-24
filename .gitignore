@@ -9,6 +9,8 @@ __pycache__/
 
 # C extensions
 *.so
+.kiro
+.amazonq
 
 # Distribution / packaging
 .Python
@@ -435,6 +437,9 @@ logs/
 uploads/
 exports/
 backups/
+.cache/
+*.cache
+.pytest_cache/
 
 # Specific data files (only ignore data files, not config files)
 /data/*.csv

@@ -8,7 +8,7 @@ from app.config import settings
 from decimal import Decimal
 from app.utils.client_encryption import ClientEncryption
 from app.utils.secrets_manager import get_secrets_manager
-from app.services.cache.redis_client import cache
+from app.services.cache_client.redis_client import cache
 logger = logging.getLogger(__name__)
 
 
@@ -100,7 +100,7 @@ class ClientModel(BaseModel):
     async def get_client(self, aws_account_id: str) -> Optional[Dict]:
         """
         Get client with HYBRID credential retrieval:
-        1. Check Redis cache first (fastest)
+        1. Check Redis cache_client first (fastest)
         2. Try Secrets Manager (if enabled)
         3. Fallback to DynamoDB (always works)
         """
@@ -392,7 +392,7 @@ class ClientModel(BaseModel):
                 }
             )
 
-            # Invalidate cache
+            # Invalidate cache_client
             self.cache.delete(f"client:{aws_account_id}")
 
             logger.info(f"Updated notification preferences for {aws_account_id}")
@@ -451,7 +451,7 @@ class ClientModel(BaseModel):
                 }
             )
 
-            # Invalidate cache
+            # Invalidate cache_client
             self.cache.delete(f"client:{aws_account_id}")
 
             logger.info(f"Set verification token for {aws_account_id}")
@@ -474,7 +474,7 @@ class ClientModel(BaseModel):
                 }
             )
 
-            # Invalidate cache
+            # Invalidate cache_client
             self.cache.delete(f"client:{aws_account_id}")
 
             logger.info(f"Email verified for {aws_account_id}")
@@ -580,11 +580,11 @@ class ClientModel(BaseModel):
         Returns: {'aws_access_key': '...', 'aws_secret_key': '...', 'aws_region': '...'}
         """
         try:
-            # Check cache first
+            # Check cache_client first
             cache_key = f"credentials:{aws_account_id}"
             cached = self.cache.get(cache_key)
             if cached:
-                logger.debug(f"Credentials cache hit for {aws_account_id}")
+                logger.debug(f"Credentials cache_client hit for {aws_account_id}")
                 return cached
 
             # Get full client
@@ -664,7 +664,7 @@ class MetricsModel(BaseModel):
             cache_key = f"metrics:{aws_account_id}:{service}:{metric_name}:{start_time.isoformat()}:{end_time.isoformat()}"
             cached = self.cache.get(cache_key)
             if cached:
-                logger.debug(f"Metrics cache hit for {aws_account_id}/{service}/{metric_name}")
+                logger.debug(f"Metrics cache_client hit for {aws_account_id}/{service}/{metric_name}")
                 return cached
 
             # Query DynamoDB

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.services.aws.client import AWSClientProvider
 from app.services.aws.cloudwatch import CloudWatchScanner
 from app.api.middleware.dependency import get_aws_client_provider
-from app.services.cache.redis_client import cache
+from app.services.cache_client.redis_client import cache
 import asyncio
 import logging
 from datetime import datetime, timedelta, UTC
@@ -44,7 +44,7 @@ async def get_cloudwatch_metrics(
                     detail="Invalid dimensions format. Use Name:Value,Name:Value"
                 )
 
-        # --- Prepare cache key ---
+        # --- Prepare cache_client key ---
         dim_key = dimensions or "none"
         cache_key = f"cloudwatch:{namespace}:{metric_name}:{period}:{stat}:{dim_key}"
 
@@ -54,8 +54,8 @@ async def get_cloudwatch_metrics(
                 logger.info("Returning cached CloudWatch data")
                 return {
                     **cache_data,
-                    "source": "cache",
-                    "cache": True
+                    "source": "cache_client",
+                    "cache_client": True
                 }
 
         # --- Set time range ---
@@ -83,7 +83,7 @@ async def get_cloudwatch_metrics(
         return {
             **report,
             "source": "aws",
-            "cache": False
+            "cache_client": False
         }
 
     except HTTPException:

@@ -139,7 +139,7 @@ artifacts:
 
 cache:
   paths:
-    - '/root/.cache/pip/**/*'
+    - '/root/.cache_client/pip/**/*'
 ```
 
 ### 3. Frontend Buildspec (frontend/buildspec.yml)

@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, Optional
 from decimal import Decimal
-from app.services.cache.redis_client import cache
+from app.services.cache_client.redis_client import cache
 from app.config import settings
 from app.database.models import (
     ClientModel,
