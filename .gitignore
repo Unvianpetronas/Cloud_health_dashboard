@@ -205,7 +205,6 @@ typings/
 .yarn-integrity
 
 # parcel-bundler cache
-.cache
 .parcel-cache
 
 # Next.js build output
@@ -216,7 +215,7 @@ typings/
 dist
 
 # Gatsby files
-.cache/
+
 public
 
 # vuepress build output
