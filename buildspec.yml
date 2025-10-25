@@ -3,6 +3,7 @@ version: 0.2
 env:
   variables:
     EC2_INSTANCE_TAG: "CloudHealth-App"
+    S3_BUCKET: "cloudhealth-deployments"
   parameter-store:
     EC2_INSTANCE_ID: /cloudhealth/ec2/instance-id
 
@@ -62,9 +63,10 @@ phases:
         EC2_INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=$EC2_INSTANCE_TAG" "Name=instance-state-name,Values=running" --query "Reservations[0].Instances[0].InstanceId" --output text);
         fi
       - echo "Target EC2 Instance - $EC2_INSTANCE_ID"
-      - echo "Encoding deployment package..."
-      - base64 /tmp/cloud-health-app.tar.gz > /tmp/cloud-health-app.tar.gz.b64
-      - echo "Encoded package size - $(du -h /tmp/cloud-health-app.tar.gz.b64 | cut -f1)"
+      - echo "Uploading deployment package to S3..."
+      - S3_KEY="builds/cloud-health-app-${CODEBUILD_BUILD_NUMBER}.tar.gz"
+      - aws s3 cp /tmp/cloud-health-app.tar.gz s3://${S3_BUCKET}/${S3_KEY}
+      - echo "Package uploaded to s3://${S3_BUCKET}/${S3_KEY}"
       - echo "Creating deployment script..."
       - >
         DEPLOY_SCRIPT='#!/bin/bash
@@ -72,7 +74,14 @@ phases:
         APP_DIR="/home/ubuntu/cloud-health-dashboard";
         DEPLOY_PACKAGE="/tmp/cloud-health-app.tar.gz";
         TIMESTAMP=$(date +%Y%m%d-%H%M%S);
+        S3_BUCKET="'${S3_BUCKET}'";
+        S3_KEY="'${S3_KEY}'";
+        echo "======================================";
         echo "Deployment started: $TIMESTAMP";
+        echo "======================================";
+        echo "Downloading deployment package from S3...";
+        aws s3 cp s3://${S3_BUCKET}/${S3_KEY} ${DEPLOY_PACKAGE};
+        echo "Package downloaded: $(du -h ${DEPLOY_PACKAGE} | cut -f1)";
         if [ -d "$APP_DIR" ]; then
         echo "Creating backup...";
         sudo tar -czf "/home/ubuntu/backup-$TIMESTAMP.tar.gz" -C "$APP_DIR" . 2>/dev/null || true;
@@ -84,16 +93,22 @@ phases:
         echo "Running deployment script...";
         cd "$APP_DIR";
         chmod +x deployment/scripts/*.sh 2>/dev/null || true;
-        ./deployment/scripts/deploy.sh 2>/dev/null || echo "No deploy.sh script found";
+        if [ -f deployment/scripts/deploy.sh ]; then
+        ./deployment/scripts/deploy.sh;
+        else
+        echo "No deploy.sh script found";
+        fi;
         rm -f "$DEPLOY_PACKAGE";
-        echo "Deployment completed: $(date)"'
+        echo "======================================";
+        echo "Deployment completed: $(date)";
+        echo "======================================"'
       - echo "Sending deployment command to EC2..."
       - >
         COMMAND_ID=$(aws ssm send-command
         --instance-ids "$EC2_INSTANCE_ID"
         --document-name "AWS-RunShellScript"
         --comment "Deploy CloudHealth Dashboard - Build $CODEBUILD_BUILD_NUMBER"
-        --parameters "commands=[\"echo 'Receiving deployment package...'\",\"echo '$(cat /tmp/cloud-health-app.tar.gz.b64)' | base64 -d > /tmp/cloud-health-app.tar.gz\",\"echo 'Package received: '\$(du -h /tmp/cloud-health-app.tar.gz | cut -f1)\",\"$DEPLOY_SCRIPT\"]"
+        --parameters "commands=[\"$DEPLOY_SCRIPT\"]"
         --output text
         --query "Command.CommandId")
       - echo "SSM Command ID - $COMMAND_ID"
