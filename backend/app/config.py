@@ -41,8 +41,8 @@ class BaseConfig(BaseSettings):
     RECOMMENDATIONS_TABLE: str = "Recommendations"
 
     # SES
-    SES_SENDER_EMAIL: str = "noreply@cloudhealthdashboard.xyz"
-    FRONTEND_URL: str = "http://localhost:3000"
+    SES_SENDER_EMAIL: str
+    FRONTEND_URL: str
     EMAIL_VERIFICATION_EXPIRE_HOURS: int = 24
 
     # Cache
