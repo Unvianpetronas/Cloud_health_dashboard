@@ -53,7 +53,7 @@ phases:
       - cp -r backend /tmp/deployment/
       - cp -r frontend/dist /tmp/deployment/frontend-build
       - cp -r deployment /tmp/deployment/
-      - [ -f .env.example ] && cp .env.example /tmp/deployment/
+      - "[ -f .env.example ] && cp .env.example /tmp/deployment/"
       
       - echo "Creating tarball..."
       - cd /tmp/deployment
