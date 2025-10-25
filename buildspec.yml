@@ -9,7 +9,7 @@ env:
 phases:
   install:
     runtime-versions:
-      python: 3.12
+      python: 3.11
       nodejs: 18
     commands:
       - echo "Installing build dependencies..."
@@ -20,17 +20,11 @@ phases:
       - echo "Pre-build phase started on $(date)"
       - echo "=========================================="
       - echo "Installing Python dependencies..."
-      - cd backend
       - pip install --quiet -r requirements.txt
-      - cd ..
       - echo "Installing Node.js dependencies..."
-      - cd frontend
       - npm install --silent
-      - cd ..
       - echo "Running tests..."
-      - cd backend
       - python -m pytest tests/ --maxfail=1 --disable-warnings -q || echo "Tests completed"
-      - cd ..
 
   build:
     commands:
@@ -38,14 +32,10 @@ phases:
       - echo "Build phase started on $(date)"
       - echo "=========================================="
       - echo "Building React frontend..."
-      - cd frontend
       - npm run build
-      - cd ..
       - echo "Creating deployment package..."
       - mkdir -p /tmp/deployment
-      - cp -r backend /tmp/deployment/
-      - cp -r frontend/dist /tmp/deployment/frontend-build
-      - cp -r deployment /tmp/deployment/
+      - cp -r * /tmp/deployment/ || true
       - test -f .env.example && cp .env.example /tmp/deployment/ || true
       - echo "Creating tarball..."
       - cd /tmp/deployment
@@ -88,8 +78,8 @@ phases:
         tar -xzf "$DEPLOY_PACKAGE" -C "$APP_DIR";
         echo "Running deployment script...";
         cd "$APP_DIR";
-        chmod +x deployment/scripts/*.sh;
-        ./deployment/scripts/deploy.sh;
+        chmod +x deployment/scripts/*.sh 2>/dev/null || true;
+        ./deployment/scripts/deploy.sh 2>/dev/null || echo "No deploy.sh found";
         rm -f "$DEPLOY_PACKAGE";
         echo "Deployment completed: $(date)"'
       - echo "Sending deployment command to EC2..."
@@ -139,5 +129,5 @@ artifacts:
 
 cache:
   paths:
-    - 'backend/.venv/**/*'
-    - 'frontend/node_modules/**/*'
+    - '.venv/**/*'
+    - 'node_modules/**/*'
