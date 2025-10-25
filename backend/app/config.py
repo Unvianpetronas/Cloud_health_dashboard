@@ -5,7 +5,7 @@ import os
 from cryptography.fernet import Fernet
 
 
-environment = os.getenv("ENVIRONMENT", "development")
+environment = os.getenv("ENVIRONMENT", "production")
 env_file = f".env.{environment}"
 if os.path.exists(env_file):
     load_dotenv(env_file)
@@ -41,8 +41,8 @@ class BaseConfig(BaseSettings):
     RECOMMENDATIONS_TABLE: str = "Recommendations"
 
     # SES
-    SES_SENDER_EMAIL: str
-    FRONTEND_URL: str
+    SES_SENDER_EMAIL: str = "noreply@cloudhealthdashboard.xyz"
+    FRONTEND_URL: str = "https://cloudhealthdashboard.xyz"
     EMAIL_VERIFICATION_EXPIRE_HOURS: int = 24
 
     # Cache
@@ -110,7 +110,10 @@ class ProductionConfig(BaseConfig):
     """Production environment configuration"""
     DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
-    CORS_ORIGINS: List[str] = []  # Must be set via environment
+    CORS_ORIGINS: List[str] = [
+        "https://cloudhealthdashboard.xyz",
+        "https://www.cloudhealthdashboard.xyz"
+    ] # Must be set via environment
 
     # Production requires real secrets from environm0ent
     JWT_SECRET_KEY: str
