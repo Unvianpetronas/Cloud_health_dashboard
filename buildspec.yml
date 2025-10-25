@@ -72,7 +72,7 @@ phases:
         cat > /tmp/deploy-script.sh << 'DEPLOY_EOF'
         #!/bin/bash
         set -e
-        APP_DIR="/home/ubuntu/cloud-health-dashboard"
+        APP_DIR="/home/ec2-user/cloud-health-dashboard"
         DEPLOY_PACKAGE="/tmp/cloud-health-app.tar.gz"
         TIMESTAMP=$(date +%Y%m%d-%H%M%S)
         echo "======================================"
@@ -83,10 +83,10 @@ phases:
         echo "Package downloaded: $(du -h ${DEPLOY_PACKAGE} | cut -f1)"
         if [ -d "$APP_DIR" ]; then
           echo "Creating backup..."
-          sudo tar -czf "/home/ubuntu/backup-$TIMESTAMP.tar.gz" -C "$APP_DIR" . 2>/dev/null || true
+          sudo tar -czf "/home/ec2-user/backup-$TIMESTAMP.tar.gz" -C "$APP_DIR" . 2>/dev/null || true
         fi
         sudo mkdir -p "$APP_DIR"
-        sudo chown ubuntu:ubuntu "$APP_DIR"
+        sudo chown ec2-user:ec2-user "$APP_DIR"
         echo "Extracting deployment package..."
         tar -xzf "$DEPLOY_PACKAGE" -C "$APP_DIR"
         echo "Running deployment script..."
