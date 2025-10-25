@@ -67,50 +67,61 @@ phases:
       - S3_KEY="builds/cloud-health-app-${CODEBUILD_BUILD_NUMBER}.tar.gz"
       - aws s3 cp /tmp/cloud-health-app.tar.gz s3://${S3_BUCKET}/${S3_KEY}
       - echo "Package uploaded to s3://${S3_BUCKET}/${S3_KEY}"
-      - echo "Creating deployment script..."
-      - >
-        DEPLOY_SCRIPT='#!/bin/bash
-        set -e;
-        APP_DIR="/home/ubuntu/cloud-health-dashboard";
-        DEPLOY_PACKAGE="/tmp/cloud-health-app.tar.gz";
-        TIMESTAMP=$(date +%Y%m%d-%H%M%S);
-        S3_BUCKET="'${S3_BUCKET}'";
-        S3_KEY="'${S3_KEY}'";
-        echo "======================================";
-        echo "Deployment started: $TIMESTAMP";
-        echo "======================================";
-        echo "Downloading deployment package from S3...";
-        aws s3 cp s3://${S3_BUCKET}/${S3_KEY} ${DEPLOY_PACKAGE};
-        echo "Package downloaded: $(du -h ${DEPLOY_PACKAGE} | cut -f1)";
+      - echo "Creating deployment script file..."
+      - |
+        cat > /tmp/deploy-script.sh << 'DEPLOY_EOF'
+        #!/bin/bash
+        set -e
+        
+        APP_DIR="/home/ubuntu/cloud-health-dashboard"
+        DEPLOY_PACKAGE="/tmp/cloud-health-app.tar.gz"
+        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+        
+        echo "======================================"
+        echo "Deployment started: $TIMESTAMP"
+        echo "======================================"
+        
+        echo "Downloading deployment package from S3..."
+        aws s3 cp s3://cloudhealth-deployments/builds/cloud-health-app-${CODEBUILD_BUILD_NUMBER}.tar.gz ${DEPLOY_PACKAGE}
+        echo "Package downloaded: $(du -h ${DEPLOY_PACKAGE} | cut -f1)"
+        
         if [ -d "$APP_DIR" ]; then
-        echo "Creating backup...";
-        sudo tar -czf "/home/ubuntu/backup-$TIMESTAMP.tar.gz" -C "$APP_DIR" . 2>/dev/null || true;
-        fi;
-        sudo mkdir -p "$APP_DIR";
-        sudo chown ubuntu:ubuntu "$APP_DIR";
-        echo "Extracting deployment package...";
-        tar -xzf "$DEPLOY_PACKAGE" -C "$APP_DIR";
-        echo "Running deployment script...";
-        cd "$APP_DIR";
-        chmod +x deployment/scripts/*.sh 2>/dev/null || true;
+          echo "Creating backup..."
+          sudo tar -czf "/home/ubuntu/backup-$TIMESTAMP.tar.gz" -C "$APP_DIR" . 2>/dev/null || true
+        fi
+        
+        sudo mkdir -p "$APP_DIR"
+        sudo chown ubuntu:ubuntu "$APP_DIR"
+        
+        echo "Extracting deployment package..."
+        tar -xzf "$DEPLOY_PACKAGE" -C "$APP_DIR"
+        
+        echo "Running deployment script..."
+        cd "$APP_DIR"
+        chmod +x deployment/scripts/*.sh 2>/dev/null || true
+        
         if [ -f deployment/scripts/deploy.sh ]; then
-        ./deployment/scripts/deploy.sh;
+          ./deployment/scripts/deploy.sh
         else
-        echo "No deploy.sh script found";
-        fi;
-        rm -f "$DEPLOY_PACKAGE";
-        echo "======================================";
-        echo "Deployment completed: $(date)";
-        echo "======================================"'
+          echo "No deploy.sh script found"
+        fi
+        
+        rm -f "$DEPLOY_PACKAGE"
+        
+        echo "======================================"
+        echo "Deployment completed: $(date)"
+        echo "======================================"
+        DEPLOY_EOF
+      - sed -i "s/\${CODEBUILD_BUILD_NUMBER}/${CODEBUILD_BUILD_NUMBER}/g" /tmp/deploy-script.sh
       - echo "Sending deployment command to EC2..."
-      - >
-        COMMAND_ID=$(aws ssm send-command
-        --instance-ids "$EC2_INSTANCE_ID"
-        --document-name "AWS-RunShellScript"
-        --comment "Deploy CloudHealth Dashboard - Build $CODEBUILD_BUILD_NUMBER"
-        --parameters "commands=[\"$DEPLOY_SCRIPT\"]"
-        --output text
-        --query "Command.CommandId")
+      - |
+        COMMAND_ID=$(aws ssm send-command \
+          --instance-ids "$EC2_INSTANCE_ID" \
+          --document-name "AWS-RunShellScript" \
+          --comment "Deploy CloudHealth Dashboard - Build ${CODEBUILD_BUILD_NUMBER}" \
+          --parameters commands="$(cat /tmp/deploy-script.sh)" \
+          --output text \
+          --query "Command.CommandId")
       - echo "SSM Command ID - $COMMAND_ID"
       - echo "Waiting for deployment to complete..."
       - >
