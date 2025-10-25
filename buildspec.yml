@@ -9,11 +9,10 @@ env:
 phases:
   install:
     runtime-versions:
-      python: 3.11
+      python: 3.12
       nodejs: 18
     commands:
       - echo "Installing build dependencies..."
-      - apt-get update -qq
 
   pre_build:
     commands:
