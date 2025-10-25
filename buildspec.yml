@@ -38,7 +38,7 @@ phases:
       - echo "Creating deployment package..."
       - mkdir -p /tmp/deployment
       - cp -r backend /tmp/deployment/
-      - cp -r frontend/dist /tmp/deployment/frontend-build
+      - cp -r frontend/build /tmp/deployment/frontend-build
       - cp -r deployment /tmp/deployment/
       - test -f .env.example && cp .env.example /tmp/deployment/ || true
       - test -f requirements.txt && cp requirements.txt /tmp/deployment/ || true
