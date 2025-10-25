@@ -8,9 +8,6 @@ env:
 
 phases:
   install:
-    runtime-versions:
-      python: 3.11
-      nodejs: 18
     commands:
       - echo "Installing build dependencies..."
 
@@ -20,11 +17,14 @@ phases:
       - echo "Pre-build phase started on $(date)"
       - echo "=========================================="
       - echo "Installing Python dependencies..."
-      - pip install --quiet -r requirements.txt
+      - test -f requirements.txt && pip install --quiet -r requirements.txt || echo "No root requirements.txt"
+      - test -f backend/requirements.txt && cd backend && pip install --quiet -r requirements.txt && cd .. || echo "No backend requirements.txt"
       - echo "Installing Node.js dependencies..."
+      - cd frontend
       - npm install --silent
+      - cd ..
       - echo "Running tests..."
-      - python -m pytest tests/ --maxfail=1 --disable-warnings -q || echo "Tests completed"
+      - test -d backend/tests && cd backend && python -m pytest tests/ --maxfail=1 --disable-warnings -q && cd .. || echo "Tests completed"
 
   build:
     commands:
@@ -32,11 +32,16 @@ phases:
       - echo "Build phase started on $(date)"
       - echo "=========================================="
       - echo "Building React frontend..."
+      - cd frontend
       - npm run build
+      - cd ..
       - echo "Creating deployment package..."
       - mkdir -p /tmp/deployment
-      - cp -r * /tmp/deployment/ || true
+      - cp -r backend /tmp/deployment/
+      - cp -r frontend/dist /tmp/deployment/frontend-build
+      - cp -r deployment /tmp/deployment/
       - test -f .env.example && cp .env.example /tmp/deployment/ || true
+      - test -f requirements.txt && cp requirements.txt /tmp/deployment/ || true
       - echo "Creating tarball..."
       - cd /tmp/deployment
       - tar -czf /tmp/cloud-health-app.tar.gz .
@@ -79,7 +84,7 @@ phases:
         echo "Running deployment script...";
         cd "$APP_DIR";
         chmod +x deployment/scripts/*.sh 2>/dev/null || true;
-        ./deployment/scripts/deploy.sh 2>/dev/null || echo "No deploy.sh found";
+        ./deployment/scripts/deploy.sh 2>/dev/null || echo "No deploy.sh script found";
         rm -f "$DEPLOY_PACKAGE";
         echo "Deployment completed: $(date)"'
       - echo "Sending deployment command to EC2..."
@@ -129,5 +134,5 @@ artifacts:
 
 cache:
   paths:
-    - '.venv/**/*'
-    - 'node_modules/**/*'
+    - 'frontend/node_modules/**/*'
+    - 'backend/.venv/**/*'
