@@ -101,17 +101,22 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
+env
 .env.development
-.env.production
+/.env.production                # Ignore root .env.production
+backend/.env.*                  # Ignore all backend env files
+backend/.env.production         # Extra protection for backend secrets
+backend/.env.development
 .venv
-backend/.env.*
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
 .venv/
+
+# Allow frontend environment config (no secrets, just public URLs)
+!frontend/.env.production       
 
 # Spyder project settings
 .spyderproject

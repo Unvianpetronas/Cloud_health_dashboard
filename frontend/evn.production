@@ -1,0 +1,2 @@
+REACT_APP_API_BASE_URL=http://cloudhealthdashboard.xyz/api
+REACT_APP_ENVIRONMENT=production
