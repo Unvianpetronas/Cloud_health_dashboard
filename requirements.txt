@@ -1,42 +1,43 @@
 # AWS SDK
 boto3==1.40.40
-botocore==1.40.40
-jmespath==1.0.1
-python-dateutil==2.9.0.post0
-s3transfer==0.14.0
-six==1.17.0
-urllib3==2.5.0
+
 
 # FastAPI & Web Framework
 fastapi==0.120.0
 uvicorn[standard]==0.38.0
 starlette==0.48.0
 
-# Pydantic (Config Management)
+# Pydantic
 pydantic==2.12.3
 pydantic-core==2.41.4
 pydantic-settings==2.7.1
 
-# Environment Variables
+# Environment & Config
 python-dotenv==1.1.1
 
-# Security & Encryption
+# Security & Authentication
 cryptography==44.0.0
-
-# Additional FastAPI Dependencies
-python-multipart==0.0.20
-email-validator==2.2.0
-
-# Optional but Recommended
-httpx==0.28.1
-redis==5.2.1
-celery==5.4.0
-
-# JWT Authentication
 PyJWT==2.10.1
-
-# Password Hashing
 passlib[bcrypt]==1.7.4
 bcrypt==4.2.1
 
+# HTTP & Email
+httpx==0.28.1
+python-multipart==0.0.20
+email-validator==2.2.0
 
+# Retry Logic
+tenacity==9.1.0
+
+# Scheduler
+apscheduler==3.10.4
+
+# Database (if needed)
+sqlalchemy==2.0.36
+alembic==1.14.0
+
+# Redis
+redis==5.2.1
+
+# Celery (if needed for background tasks)
+celery==5.4.0

@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 from app.services.aws.client import AWSClientProvider
 from app.services.email.ses_client import SESEmailService
-from base_scanner import BaseAWSScanner
+from .base_scanner import BaseAWSScanner
 logger = logging.getLogger(__name__)
 
 

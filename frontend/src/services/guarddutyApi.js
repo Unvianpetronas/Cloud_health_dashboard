@@ -1,64 +1,64 @@
 import apiClient from "./api";
 
-const API_BASE_URL = 'http://localhost:8000/api/v1';
-
 export const guarddutyApi = {
-    getStatus : async() => {
+    getStatus: async () => {
         try {
-            const response = await apiClient.get('/guardduty/status')
+            const response = await apiClient.get('/guardduty/status');
             return {
                 success: true,
                 data: response.data
             };
-        }catch (error) {
+        } catch (error) {
             return {
                 success: false,
-                error: error.response?.data?.detail || 'Failed to scan EC2 instances'
+                error: error.response?.data?.detail || 'Failed to get GuardDuty status'
             };
         }
     },
 
-    getFindings : async() => {
-        try{
-            const  response  = await apiClient.get('/guardduty/findings')
-            return{
-                success : true,
-                data : response.data
+
+    getFindings: async () => {
+        try {
+            const response = await apiClient.get('/guardduty/findings');
+            return {
+                success: true,
+                data: response.data
             };
         } catch (error) {
             return {
                 success: false,
-                error: error.response?.data?.detail || 'Failed to scan EC2 instances'
+                error: error.response?.data?.detail || 'Failed to get GuardDuty findings'
             };
         }
     },
 
-    getCritical : async() => {
-        try{
-            const response  = await apiClient.get('/guardduty/critical')
-            return{
-                success : true,
-                data : response.data
-            }
-        }catch (error) {
+
+    getCritical: async () => {
+        try {
+            const response = await apiClient.get('/guardduty/critical');
+            return {
+                success: true,
+                data: response.data
+            };
+        } catch (error) {
             return {
                 success: false,
-                error: error.response?.data?.detail || 'Failed to scan EC2 instances'
+                error: error.response?.data?.detail || 'Failed to get critical findings'
             };
         }
     },
 
-    getSumary : async() =>{
-        try{
-            const response = await  apiClient.get('/guardduty/summary')
-            return{
-                success : true,
-                data : response.data
-            }
-        }catch (error) {
+    getSummary: async () => {
+        try {
+            const response = await apiClient.get('/guardduty/summary');
+            return {
+                success: true,
+                data: response.data
+            };
+        } catch (error) {
             return {
                 success: false,
-                error: error.response?.data?.detail || 'Failed to scan EC2 instances'
+                error: error.response?.data?.detail || 'Failed to get GuardDuty summary'
             };
         }
     }

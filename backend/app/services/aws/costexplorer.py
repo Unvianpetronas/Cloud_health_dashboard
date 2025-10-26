@@ -2,7 +2,7 @@ from typing import Dict, List
 from datetime import datetime, timedelta, UTC
 from .client import AWSClientProvider
 from botocore.exceptions import ClientError
-from base_scanner import BaseAWSScanner
+from .base_scanner import BaseAWSScanner
 
 class CostExplorerScanner(BaseAWSScanner):
     """

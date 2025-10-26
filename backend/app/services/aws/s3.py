@@ -3,7 +3,7 @@ from botocore.exceptions import ClientError
 from .client import AWSClientProvider
 import logging
 from datetime import datetime, timedelta, UTC
-from base_scanner import BaseAWSScanner
+from .base_scanner import BaseAWSScanner
 logger = logging.getLogger(__name__)
 
 class S3Scanner(BaseAWSScanner):

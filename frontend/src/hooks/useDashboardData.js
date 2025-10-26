@@ -1,12 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { ec2Api } from '../services/ec2Api';
+import { guarddutyApi } from '../services/guarddutyApi';
 
 const useDashboardData = (timeRange = '24h') => {
   const { isAuthenticated } = useAuth();
   const [data, setData] = useState({
     ec2Summary: null,
     ec2Cost: null,
+    guarddutyStatus: null,
+    guarddutyFindings: null,
+    guarddutyCritical: null,
+    guarddutySummary: null,
     performance: null,
     serviceHealth: null,
     alerts: null,
@@ -16,7 +21,7 @@ const useDashboardData = (timeRange = '24h') => {
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
 
-  // Mock data
+  // Mock data for performance and service health
   const mockData = {
     performance: [
       { time: '00:00', cpu: 45, memory: 62, network: 23, storage: 78 },
@@ -32,65 +37,46 @@ const useDashboardData = (timeRange = '24h') => {
       { name: 'Warning', value: 12, color: '#f59e0b' },
       { name: 'Critical', value: 3, color: '#ef4444' },
       { name: 'Unknown', value: 1, color: '#6b7280' }
-    ],
-    alerts: [
-      {
-        id: 1,
-        severity: 'critical',
-        service: 'EC2',
-        message: 'High CPU utilization on instance i-1234567890abcdef0',
-        timestamp: '2 minutes ago',
-        region: 'us-east-1'
-      },
-      {
-        id: 2,
-        severity: 'warning',
-        service: 'RDS',
-        message: 'Database connection pool near capacity',
-        timestamp: '15 minutes ago',
-        region: 'us-west-2'
-      },
-      {
-        id: 3,
-        severity: 'info',
-        service: 'S3',
-        message: 'Scheduled maintenance completed successfully',
-        timestamp: '1 hour ago',
-        region: 'eu-west-1'
-      }
-    ],
-    serviceStatus: [
-      { name: 'EC2', status: 'healthy', instances: 24, region: 'us-east-1' },
-      { name: 'RDS', status: 'warning', instances: 8, region: 'us-west-2' },
-      { name: 'Lambda', status: 'healthy', instances: 156, region: 'global' },
-      { name: 'S3', status: 'healthy', instances: 12, region: 'global' },
-      { name: 'CloudFront', status: 'critical', instances: 3, region: 'global' },
-      { name: 'ELB', status: 'healthy', instances: 15, region: 'us-east-1' }
     ]
   };
 
   const fetchDashboardData = useCallback(async () => {
-    // ✅ Only check isAuthenticated
     if (!isAuthenticated) {
-      console.log('⚠️ Not authenticated, skipping API calls');
+      console.log('️ Not authenticated, skipping API calls');
       return;
     }
 
-    console.log('🔄 Fetching dashboard data...');
+    console.log(' Fetching dashboard data...');
     setLoading(true);
     setError(null);
 
     try {
-      // Fetch REAL EC2 data
-      console.log('📡 Calling EC2 APIs...');
-      const [summaryResult, costResult] = await Promise.all([
+      // Fetch REAL EC2 and GuardDuty data in parallel
+      console.log(' Calling EC2 and GuardDuty APIs...');
+      const [
+        summaryResult,
+        costResult,
+        gdStatusResult,
+        gdFindingsResult,
+        gdCriticalResult,
+        gdSummaryResult
+      ] = await Promise.all([
         ec2Api.getInstanceSummary(),
-        ec2Api.getCostEstimate()
+        ec2Api.getCostEstimate(),
+        guarddutyApi.getStatus(),
+        guarddutyApi.getFindings(),
+        guarddutyApi.getCritical(),
+        guarddutyApi.getSummary()
       ]);
 
-      console.log('📊 Summary Result:', summaryResult);
-      console.log('💰 Cost Result:', costResult);
+      console.log(' EC2 Summary Result:', summaryResult);
+      console.log(' EC2 Cost Result:', costResult);
+      console.log(' GuardDuty Status Result:', gdStatusResult);
+      console.log(' GuardDuty Findings Result:', gdFindingsResult);
+      console.log('GuardDuty Critical Result:', gdCriticalResult);
+      console.log(' GuardDuty Summary Result:', gdSummaryResult);
 
+      // Check for critical errors (EC2)
       if (!summaryResult.success) {
         throw new Error(summaryResult.error);
       }
@@ -98,49 +84,107 @@ const useDashboardData = (timeRange = '24h') => {
         throw new Error(costResult.error);
       }
 
+      // GuardDuty errors are non-critical - log but don't fail
+      const guarddutyStatus = gdStatusResult.success ? gdStatusResult.data : null;
+      const guarddutyFindings = gdFindingsResult.success ? gdFindingsResult.data : null;
+      const guarddutyCritical = gdCriticalResult.success ? gdCriticalResult.data : null;
+      const guarddutySummary = gdSummaryResult.success ? gdSummaryResult.data : null;
+
+      if (!gdStatusResult.success) {
+        console.warn(' GuardDuty status error:', gdStatusResult.error);
+      }
+      if (!gdFindingsResult.success) {
+        console.warn(' GuardDuty findings error:', gdFindingsResult.error);
+      }
+
+      // Create alerts array from GuardDuty critical findings
+      const guarddutyAlerts = guarddutyCritical?.findings?.map((finding, index) => ({
+        id: `gd-${index}`,
+        severity: finding.severity?.toLowerCase() || 'critical',
+        service: 'GuardDuty',
+        message: finding.title || finding.description || 'Security finding detected',
+        timestamp: new Date(finding.updatedAt || finding.createdAt).toLocaleString(),
+        region: finding.region || 'unknown'
+      })) || [];
+
+      // Mock alerts for demo (you can remove these later)
+      const mockAlerts = [
+        {
+          id: 1,
+          severity: 'warning',
+          service: 'EC2',
+          message: 'High CPU utilization detected on instance',
+          timestamp: '5 minutes ago',
+          region: 'us-east-1'
+        }
+      ];
+
+      // Combine alerts
+      const allAlerts = [...guarddutyAlerts, ...mockAlerts];
+
+      // Mock service status (you can update this with real data later)
+      const serviceStatus = [
+        {
+          name: 'EC2',
+          status: summaryResult.data?.has_instances ? 'healthy' : 'unknown',
+          instances: summaryResult.data?.total_instances || 0,
+          region: 'multi-region'
+        },
+        {
+          name: 'GuardDuty',
+          status: guarddutyStatus?.enabled ? 'healthy' : 'warning',
+          instances: guarddutySummary?.total_findings || 0,
+          region: 'multi-region'
+        }
+      ];
+
       setData({
         ec2Summary: summaryResult.data,
         ec2Cost: costResult.data,
+        guarddutyStatus,
+        guarddutyFindings,
+        guarddutyCritical,
+        guarddutySummary,
         performance: mockData.performance,
         serviceHealth: mockData.serviceHealth,
-        alerts: mockData.alerts,
-        serviceStatus: mockData.serviceStatus
+        alerts: allAlerts,
+        serviceStatus
       });
 
       setLastUpdated(new Date());
-      console.log('✅ Dashboard data loaded successfully');
+      console.log(' Dashboard data loaded successfully');
 
     } catch (err) {
       const errorMessage = err.message || 'Failed to fetch dashboard data';
       setError(errorMessage);
-      console.error('❌ Error fetching dashboard data:', err);
+      console.error(' Error fetching dashboard data:', err);
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, timeRange]); // ✅ Removed token dependency
+  }, [isAuthenticated, timeRange]);
 
   useEffect(() => {
-    console.log('🎯 useDashboardData mounted, isAuthenticated:', isAuthenticated);
+    console.log(' useDashboardData mounted, isAuthenticated:', isAuthenticated);
     fetchDashboardData();
   }, [fetchDashboardData]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    console.log('⏰ Setting up auto-refresh (5 min)');
+    console.log(' Setting up auto-refresh (5 min)');
     const interval = setInterval(() => {
-      console.log('🔄 Auto-refreshing dashboard...');
+      console.log(' Auto-refreshing dashboard...');
       fetchDashboardData();
     }, 5 * 60 * 1000);
 
     return () => {
-      console.log('🛑 Cleaning up auto-refresh');
+      console.log(' Cleaning up auto-refresh');
       clearInterval(interval);
     };
   }, [fetchDashboardData, isAuthenticated]);
 
   const refresh = useCallback(() => {
-    console.log('🔄 Manual refresh triggered');
+    console.log(' Manual refresh triggered');
     fetchDashboardData();
   }, [fetchDashboardData]);
 

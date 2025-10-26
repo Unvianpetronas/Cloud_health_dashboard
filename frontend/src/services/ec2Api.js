@@ -1,7 +1,5 @@
 import apiClient from './api';
 
-const API_BASE_URL = 'http://localhost:8000/api/v1';
-
 export const ec2Api = {
     // Scan all EC2 instances across regions
     scanAllRegions: async () => {

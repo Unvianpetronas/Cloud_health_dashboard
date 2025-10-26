@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
 from botocore.exceptions import ClientError
 from .client import AWSClientProvider
-from base_scanner import BaseAWSScanner
+from .base_scanner import BaseAWSScanner
 
 logger = logging.getLogger(__name__)
 
