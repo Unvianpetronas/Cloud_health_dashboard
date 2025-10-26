@@ -112,7 +112,9 @@ class ProductionConfig(BaseConfig):
     LOG_LEVEL: str = "INFO"
     CORS_ORIGINS: List[str] = [
         "https://cloudhealthdashboard.xyz",
-        "https://www.cloudhealthdashboard.xyz"
+        "https://www.cloudhealthdashboard.xyz",
+        "http://cloudhealthdashboard.xyz",
+        "http://www.cloudhealthdashboard.xyz"
     ] # Must be set via environment
 
     # Production requires real secrets from environm0ent
