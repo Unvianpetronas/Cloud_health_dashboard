@@ -1,17 +1,19 @@
-import asyncio
-from fastapi import APIRouter, HTTPException, status
+import fastapi
+from fastapi import APIRouter, HTTPException, status, Request, Depends
 from pydantic import BaseModel, Field, EmailStr
 from typing import Optional
 import logging
+import asyncio
 from app.database.models import ClientModel
 from app.services.aws.iam import verify_aws_credentials
-from app.worker import CloudHealthWorker
 from app.services.aws.client import AWSClientProvider
+from app.worker import CloudHealthWorker
 from app.utils.jwt_handler import (
     create_access_token,
     create_refresh_token,
     decode_refresh_token
 )
+from app.main import app as fastapi_app
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -130,9 +132,9 @@ async def authenticate(request: AuthRequest):
         refresh_token = create_refresh_token({"sub": aws_account_id})
         logger.info(f"Tokens generated for {aws_account_id}")
         try:
-            if hasattr(request.app.state, 'client_workers'):
-                if aws_account_id in request.app.state.client_workers:
-                    existing_task = request.app.state.client_workers[aws_account_id]
+            if hasattr(fastapi_app.state, 'client_workers'):
+                if aws_account_id in fastapi_app.app.state.client_workers:
+                    existing_task = fastapi_app.app.state.client_workers[aws_account_id]
 
                     if not existing_task.done():
                         logger.warning(
