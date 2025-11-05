@@ -8,7 +8,6 @@ const Login = () => {
   const { login, isAuthenticated, isLoading, error, clearError } = useAuth();
   const { isDark } = useTheme();
 
-  // ✅ CORRECT: Field names match backend
   const [formData, setFormData] = useState({
     aws_access_key: '',
     aws_secret_key: ''

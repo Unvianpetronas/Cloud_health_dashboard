@@ -1,5 +1,4 @@
 import asyncio
-from multiprocessing.pool import worker
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field, EmailStr
 from typing import Optional
