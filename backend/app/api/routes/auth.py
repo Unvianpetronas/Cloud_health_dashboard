@@ -1,4 +1,3 @@
-import fastapi
 from fastapi import APIRouter, HTTPException, status, Request, Depends
 from pydantic import BaseModel, Field, EmailStr
 from typing import Optional
@@ -13,7 +12,6 @@ from app.utils.jwt_handler import (
     create_refresh_token,
     decode_refresh_token
 )
-from app.main import app as fastapi_app
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -39,15 +37,15 @@ class TokenResponse(BaseModel):
 
 
 @router.post("/auth/login", response_model=TokenResponse)
-async def authenticate(request: AuthRequest):
+async def authenticate(auth_request: AuthRequest, request: Request):
     client_model = ClientModel()
 
     try:
         logger.info("Verifying AWS credentials...")
 
         identity = await verify_aws_credentials(
-            access_key=request.aws_access_key,
-            secret_key=request.aws_secret_key
+            access_key=auth_request.aws_access_key,
+            secret_key=auth_request.aws_secret_key
         )
 
         if not identity:
@@ -69,9 +67,9 @@ async def authenticate(request: AuthRequest):
             # Update credentials (supports key rotation)
             await client_model.update_credentials(
                 aws_account_id=aws_account_id,
-                aws_access_key=request.aws_access_key,
-                aws_secret_key=request.aws_secret_key,
-                aws_region=request.aws_region
+                aws_access_key=auth_request.aws_access_key,
+                aws_secret_key=auth_request.aws_secret_key,
+                aws_region=auth_request.aws_region
             )
 
             # Check status
@@ -81,7 +79,7 @@ async def authenticate(request: AuthRequest):
                     detail=f"Account is {existing_client.get('status')}"
                 )
 
-            logger.info(f" Login: {client_id}")
+            logger.info(f"👤 Login: {client_id}")
             is_new = False
             client_email = existing_client.get('email')
             client_company = existing_client.get('company_name')
@@ -90,8 +88,8 @@ async def authenticate(request: AuthRequest):
             # New account - auto-create
             logger.info(f"Creating account for AWS {aws_account_id}")
 
-            if request.company_name:
-                client_company = request.company_name
+            if auth_request.company_name:
+                client_company = auth_request.company_name
             else:
                 # Extract name from ARN
                 if ':user/' in aws_user_arn:
@@ -100,8 +98,8 @@ async def authenticate(request: AuthRequest):
                 else:
                     client_company = f"AWS Account {aws_account_id}"
 
-            if request.email:
-                client_email = request.email
+            if auth_request.email:
+                client_email = auth_request.email
             else:
                 client_email = f"{aws_account_id}@cloudhealth.com"
 
@@ -111,9 +109,9 @@ async def authenticate(request: AuthRequest):
                 email=client_email,
                 company_name=client_company,
                 aws_account_id=aws_account_id,
-                aws_access_key=request.aws_access_key,
-                aws_secret_key=request.aws_secret_key,
-                aws_region=request.aws_region
+                aws_access_key=auth_request.aws_access_key,
+                aws_secret_key=auth_request.aws_secret_key,
+                aws_region=auth_request.aws_region
             )
 
             if not client_id:
@@ -128,55 +126,61 @@ async def authenticate(request: AuthRequest):
             "sub": aws_account_id,
             "aws_account_id": aws_account_id
         }
+
         access_token = create_access_token(token_data)
         refresh_token = create_refresh_token({"sub": aws_account_id})
+
         logger.info(f"Tokens generated for {aws_account_id}")
+
         try:
-            if hasattr(fastapi_app.state, 'client_workers'):
-                if aws_account_id in fastapi_app.state.client_workers:
-                    existing_task = fastapi_app.state.client_workers[aws_account_id]
+            if hasattr(request.app.state, 'client_workers'):
+                if aws_account_id in request.app.state.client_workers:
+                    existing_task = request.app.state.client_workers[aws_account_id]
 
                     if not existing_task.done():
-                        logger.warning(
-                            f"Worker already running for {aws_account_id[:8]}... - cancelling old worker")
+                        logger.warning(f"Worker already running for {aws_account_id[:8]}... - cancelling old worker")
                         existing_task.cancel()
                         await asyncio.sleep(0.5)  # Give it time to stop
 
+
             client_provider = AWSClientProvider(
-                aws_access_key=request.aws_access_key,
-                aws_secret_key=request.aws_secret_key,
-                aws_region=request.aws_region
+                aws_access_key=auth_request.aws_access_key,
+                aws_secret_key=auth_request.aws_secret_key,
+                aws_region=auth_request.aws_region
             )
+
+
             sts = client_provider.get_client('sts')
             account_id = sts.get_caller_identity()['Account']
 
             if account_id == aws_account_id:
                 worker = CloudHealthWorker(
                     client_provider,
-                    account_id,
+                    aws_account_id,
                     access_token
                 )
                 worker_task = asyncio.create_task(worker.start())
 
-                if not hasattr(fastapi_app.state, 'client_workers'):
-                    fastapi_app.state.client_workers = {}
+                # Initialize dict if needed
+                if not hasattr(request.app.state, 'client_workers'):
+                    request.app.state.client_workers = {}
 
-                fastapi_app.state.client_workers[aws_account_id] = worker_task
+                # Store worker
+                request.app.state.client_workers[aws_account_id] = worker_task
 
-                logger.info(f" Worker started for {aws_account_id[:8]}...")
-
+                logger.info(f"Worker started for {aws_account_id[:8]}...")
             else:
+                logger.error(f"Account ID mismatch: {account_id} != {aws_account_id}")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Invalid AWS credentials"
                 )
+
+        except HTTPException:
+            raise
         except Exception as e:
-            logger.error(f"Failed to create worker: {e}", exc_info=True)
-            logger.info(f"start worker fail for {aws_account_id}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to create worker"
-            )
+            logger.error(f"Failed to start worker: {e}", exc_info=True)
+            logger.warning(f"Login successful but worker failed to start for {aws_account_id[:8]}...")
 
         return TokenResponse(
             access_token=access_token,
@@ -185,7 +189,7 @@ async def authenticate(request: AuthRequest):
             expires_in=60 * 60,  # 60 minutes in seconds
             aws_account_id=aws_account_id,
             is_new_account=is_new,
-            email=request.email or None,
+            email=auth_request.email or None,
             company_name=client_company
         )
 
@@ -257,4 +261,54 @@ async def refresh_token_endpoint(request: dict):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired refresh token"
+        )
+
+
+@router.post("/auth/logout")
+async def logout(
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Logout endpoint - stops background worker and invalidates session
+
+    This endpoint:
+    1. Stops the background data collection worker for the user
+    2. Removes worker from active workers registry
+    3. Frees up system resources
+
+    Note: The JWT token itself is not revoked (stateless design).
+    Client should discard the token after logout.
+    """
+    try:
+        aws_account_id = current_user['aws_account_id']
+        logger.info(f"Logout request from {aws_account_id[:8]}...")
+
+        # Stop worker if exists
+        worker_stopped = False
+        if hasattr(request.app.state, 'client_workers'):
+            if aws_account_id in request.app.state.client_workers:
+                worker_task = request.app.state.client_workers[aws_account_id]
+
+                if not worker_task.done():
+                    worker_task.cancel()
+                    logger.info(f"Stopped worker for {aws_account_id[:8]}...")
+                    worker_stopped = True
+
+                # Remove from registry
+                del request.app.state.client_workers[aws_account_id]
+                logger.info(f"Removed worker from registry for {aws_account_id[:8]}...")
+
+        return {
+            "message": "Logged out successfully",
+            "aws_account_id": aws_account_id[:8] + "...",
+            "worker_stopped": worker_stopped,
+            "note": "Please discard your access token"
+        }
+
+    except Exception as e:
+        logger.error(f"Logout error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Logout failed"
         )

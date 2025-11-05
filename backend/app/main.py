@@ -151,7 +151,6 @@ app.include_router(auth.router, prefix="/api/v1", tags=["Authentication"])
 app.include_router(ec2.router, prefix="/api/v1", tags=["EC2"])
 app.include_router(guardduty.router, prefix="/api/v1", tags=["GuardDuty"])
 app.include_router(email.router, prefix="/api/v1", tags=["Email"])
-
 #app.include_router(architecture.router, prefix="/api/v1", tags=["Architecture"])
 
 
