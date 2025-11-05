@@ -133,8 +133,8 @@ async def authenticate(request: AuthRequest):
         logger.info(f"Tokens generated for {aws_account_id}")
         try:
             if hasattr(fastapi_app.state, 'client_workers'):
-                if aws_account_id in fastapi_app.app.state.client_workers:
-                    existing_task = fastapi_app.app.state.client_workers[aws_account_id]
+                if aws_account_id in fastapi_app.state.client_workers:
+                    existing_task = fastapi_app.state.client_workers[aws_account_id]
 
                     if not existing_task.done():
                         logger.warning(
@@ -158,10 +158,10 @@ async def authenticate(request: AuthRequest):
                 )
                 worker_task = asyncio.create_task(worker.start())
 
-                if not hasattr(request.app.state, 'client_workers'):
-                    request.app.state.client_workers = {}
+                if not hasattr(fastapi_app.state, 'client_workers'):
+                    fastapi_app.state.client_workers = {}
 
-                request.app.state.client_workers[aws_account_id] = worker_task
+                fastapi_app.state.client_workers[aws_account_id] = worker_task
 
                 logger.info(f" Worker started for {aws_account_id[:8]}...")
 
