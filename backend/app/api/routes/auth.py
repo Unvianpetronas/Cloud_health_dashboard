@@ -12,7 +12,7 @@ from app.utils.jwt_handler import (
     create_refresh_token,
     decode_refresh_token
 )
-
+from app.api.middleware.dependency import get_current_client_id
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
@@ -267,7 +267,7 @@ async def refresh_token_endpoint(request: dict):
 @router.post("/auth/logout")
 async def logout(
     request: Request,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_client_id)
 ):
     """
     Logout endpoint - stops background worker and invalidates session
