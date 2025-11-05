@@ -7,7 +7,6 @@ import asyncio
 from app.config import settings
 from app.api.routes import auth, ec2, guardduty, email
 from app.database.dynamodb import DynamoDBConnection
-from app.worker import CloudHealthWorker
 from app.scheduler.notification_scheduler import notification_scheduler
 from app.scheduler.critical_alert_monitor import critical_alert_monitor
 
@@ -42,28 +41,41 @@ async def lifespan(app: FastAPI):
         raise
 
 
-    worker_task = None
-    try:
-        logger.info("Initializing background worker...")
+    # Initialize multi-tenant worker registry
+    app.state.client_workers = {}
+    logger.info("Multi-tenant worker system initialized")
+    logger.info(f"Worker collection interval: {settings.WORKER_COLLECTION_INTERVAL} seconds")
 
-        # Check if AWS credentials are configured
-        worker = CloudHealthWorker()
-        # Create background task for worker
-        worker_task = asyncio.create_task(worker.start())
-        app.state.worker_task = worker_task
-        logger.info("Background worker started!")
-        logger.info(f"Collection interval: {settings.METRICS_COLLECTION_INTERVAL} seconds")
+    # Start worker cleanup task
+    async def cleanup_finished_workers():
+        """Periodically remove finished worker tasks to prevent memory leaks"""
+        while True:
+            try:
+                await asyncio.sleep(300)  # Every 5 minutes
 
-    except Exception as e:
-        logger.error(f"Warning: Could not start background worker: {e}")
-        logger.info("API will continue without background data collection")
+                if hasattr(app.state, 'client_workers'):
+                    finished = [
+                        cid for cid, task in app.state.client_workers.items()
+                        if task.done()
+                    ]
+
+                    for cid in finished:
+                        logger.info(f"Cleaning up finished worker for {cid[:8]}...")
+                        del app.state.client_workers[cid]
+
+                    if finished:
+                        logger.info(f"✓ Cleaned up {len(finished)} finished workers")
+            except Exception as e:
+                logger.error(f"Error in worker cleanup task: {e}", exc_info=True)
+
+    app.state.cleanup_task = asyncio.create_task(cleanup_finished_workers())
+    logger.info("Worker cleanup task started (runs every 5 minutes)")
 
     # Show startup summary
     logger.info("=" * 70)
     logger.info(f"{settings.APP_NAME} is ready!")
     logger.info(f"API: http://{settings.HOST}:{settings.PORT}")
     logger.info(f"Database: DynamoDB ({'connected' if db else 'disconnected'})")
-    logger.info(f"Worker: {'Running' if worker_task else 'Disabled'}")
     logger.info("=" * 70)
     notification_scheduler.start(hour=8, minute=0)
     logger.info("Daily notification scheduler started")
@@ -75,6 +87,27 @@ async def lifespan(app: FastAPI):
 
     logger.info("Shutting down application")
 
+    # Stop all client workers
+    if hasattr(app.state, 'client_workers'):
+        logger.info(f"Stopping {len(app.state.client_workers)} client workers...")
+        for client_id, worker_task in list(app.state.client_workers.items()):
+            try:
+                if not worker_task.done():
+                    worker_task.cancel()
+                    logger.info(f"Stopped worker for {client_id[:8]}...")
+            except Exception as e:
+                logger.error(f"Error stopping worker: {e}")
+        app.state.client_workers.clear()
+        logger.info("All client workers stopped")
+
+    # Stop cleanup task
+    if hasattr(app.state, 'cleanup_task'):
+        app.state.cleanup_task.cancel()
+        try:
+            await app.state.cleanup_task
+        except asyncio.CancelledError:
+            logger.info("Worker cleanup task stopped")
+
     notification_scheduler.stop()
     logger.info("Daily summary scheduler stopped")
 
@@ -82,19 +115,6 @@ async def lifespan(app: FastAPI):
     logger.info("Critical alert monitor stopped")
 
     logger.info("=" * 60)
-
-
-
-
-    if hasattr(app.state, 'worker_task') and app.state.worker_task:
-        if not app.state.worker_task.done():
-            logger.info("Stopping background worker...")
-            app.state.worker_task.cancel()
-            try:
-                await app.state.worker_task
-            except asyncio.CancelledError:
-                logger.info("Background worker stopped")
-
     logger.info("Shutdown complete")
 
 
@@ -132,20 +152,23 @@ app.include_router(ec2.router, prefix="/api/v1", tags=["EC2"])
 app.include_router(guardduty.router, prefix="/api/v1", tags=["GuardDuty"])
 app.include_router(email.router, prefix="/api/v1", tags=["Email"])
 
+#app.include_router(architecture.router, prefix="/api/v1", tags=["Architecture"])
+
 
 @app.get("/")
 async def root():
     """Root endpoint with system status"""
-    worker_status = "disabled"
-    if hasattr(app.state, 'worker_task') and app.state.worker_task:
-        worker_status = "running" if not app.state.worker_task.done() else "stopped"
+
+    worker_count = 0
+    if hasattr(app.state, 'client_workers'):
+        worker_count = len(app.state.client_workers)
 
     return {
         "app": settings.APP_NAME,
         "version": settings.VERSION,
         "environment": settings.ENVIRONMENT,
         "status": "running",
-        "worker": worker_status
+        "active_workers": worker_count
     }
 
 
@@ -156,18 +179,17 @@ async def health_check():
         # Test database connection
         db = app.state.db
         db_healthy = await db.test_connection()
-        worker_running = False
-        worker_status = "disabled"
-        if hasattr(app.state, 'worker_task') and app.state.worker_task:
-            worker_running = not app.state.worker_task.done()
-            worker_status = "running" if worker_running else "stopped"
+        worker_count = 0
+        if hasattr(app.state, 'client_workers'):
+            worker_count = len(app.state.client_workers)
+        worker_status = f"{worker_count} active"
 
         return {
             "status": "healthy" if db_healthy else "unhealthy",
             "version": settings.VERSION,
             "environment": settings.ENVIRONMENT,
             "database": "connected" if db_healthy else "disconnected",
-            "worker": worker_status,
+            "workers": worker_status,
             "timestamp": time.time()
         }
     except Exception as e:
@@ -182,23 +204,26 @@ async def health_check():
 
 @app.get("/api/v1/worker/status")
 async def get_worker_status():
-    """Get detailed worker status"""
-    if not hasattr(app.state, 'worker_task') or not app.state.worker_task:
+    """Get detailed worker status for all clients"""
+
+    if not hasattr(app.state, 'client_workers'):
         return {
             "enabled": False,
-            "running": False,
-            "status": "disabled",
-            "message": "Worker is not initialized (check AWS credentials)"
+            "total_workers": 0,
+            "status": "Worker system not initialized"
         }
 
-    worker_running = not app.state.worker_task.done()
+    active_workers = sum(
+        1 for task in app.state.client_workers.values()
+        if not task.done()
+    )
 
     return {
         "enabled": True,
-        "running": worker_running,
-        "status": "running" if worker_running else "stopped",
-        "collection_interval": settings.METRICS_COLLECTION_INTERVAL,
-        "region": settings.YOUR_AWS_REGION
+        "total_workers": len(app.state.client_workers),
+        "active_workers": active_workers,
+        "collection_interval": settings.WORKER_COLLECTION_INTERVAL,
+        "clients": [f"{cid[:8]}..." for cid in app.state.client_workers.keys()]
     }
 
 

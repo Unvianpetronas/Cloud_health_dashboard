@@ -1,9 +1,13 @@
+import asyncio
+from multiprocessing.pool import worker
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field, EmailStr
 from typing import Optional
 import logging
 from app.database.models import ClientModel
 from app.services.aws.iam import verify_aws_credentials
+from app.worker import CloudHealthWorker
+from app.services.aws.client import AWSClientProvider
 from app.utils.jwt_handler import (
     create_access_token,
     create_refresh_token,
@@ -76,7 +80,7 @@ async def authenticate(request: AuthRequest):
                     detail=f"Account is {existing_client.get('status')}"
                 )
 
-            logger.info(f"👤 Login: {client_id}")
+            logger.info(f" Login: {client_id}")
             is_new = False
             client_email = existing_client.get('email')
             client_company = existing_client.get('company_name')
@@ -123,11 +127,55 @@ async def authenticate(request: AuthRequest):
             "sub": aws_account_id,
             "aws_account_id": aws_account_id
         }
-
         access_token = create_access_token(token_data)
         refresh_token = create_refresh_token({"sub": aws_account_id})
-
         logger.info(f"Tokens generated for {aws_account_id}")
+        try:
+            if hasattr(request.app.state, 'client_workers'):
+                if aws_account_id in request.app.state.client_workers:
+                    existing_task = request.app.state.client_workers[aws_account_id]
+
+                    if not existing_task.done():
+                        logger.warning(
+                            f"Worker already running for {aws_account_id[:8]}... - cancelling old worker")
+                        existing_task.cancel()
+                        await asyncio.sleep(0.5)  # Give it time to stop
+
+            client_provider = AWSClientProvider(
+                aws_access_key=request.aws_access_key,
+                aws_secret_key=request.aws_secret_key,
+                aws_region=request.aws_region
+            )
+            sts = client_provider.get_client('sts')
+            account_id = sts.get_caller_identity()['Account']
+
+            if account_id == aws_account_id:
+                worker = CloudHealthWorker(
+                    client_provider,
+                    account_id,
+                    access_token
+                )
+                worker_task = asyncio.create_task(worker.start())
+
+                if not hasattr(request.app.state, 'client_workers'):
+                    request.app.state.client_workers = {}
+
+                request.app.state.client_workers[aws_account_id] = worker_task
+
+                logger.info(f" Worker started for {aws_account_id[:8]}...")
+
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid AWS credentials"
+                )
+        except Exception as e:
+            logger.error(f"Failed to create worker: {e}", exc_info=True)
+            logger.info(f"start worker fail for {aws_account_id}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create worker"
+            )
 
         return TokenResponse(
             access_token=access_token,

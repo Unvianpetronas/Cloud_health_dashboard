@@ -7,11 +7,13 @@ const useDashboardData = (timeRange = '24h') => {
   const { isAuthenticated } = useAuth();
   const [data, setData] = useState({
     ec2Summary: null,
+    ec2Instances: null,  // NEW: All EC2 instances for table
     ec2Cost: null,
     guarddutyStatus: null,
     guarddutyFindings: null,
     guarddutyCritical: null,
     guarddutySummary: null,
+    allFindings: null,  // NEW: Flattened GuardDuty findings for table
     performance: null,
     serviceHealth: null,
     alerts: null,
@@ -56,6 +58,7 @@ const useDashboardData = (timeRange = '24h') => {
       const [
         summaryResult,
         costResult,
+        allInstancesResult,  // NEW: Fetch all EC2 instances
         gdStatusResult,
         gdFindingsResult,
         gdCriticalResult,
@@ -63,6 +66,7 @@ const useDashboardData = (timeRange = '24h') => {
       ] = await Promise.all([
         ec2Api.getInstanceSummary(),
         ec2Api.getCostEstimate(),
+        ec2Api.scanAllRegions(),  // NEW: Scan all regions for EC2 instances
         guarddutyApi.getStatus(),
         guarddutyApi.getFindings(),
         guarddutyApi.getCritical(),
@@ -71,6 +75,7 @@ const useDashboardData = (timeRange = '24h') => {
 
       console.log(' EC2 Summary Result:', summaryResult);
       console.log(' EC2 Cost Result:', costResult);
+      console.log(' EC2 All Instances Result:', allInstancesResult);
       console.log(' GuardDuty Status Result:', gdStatusResult);
       console.log(' GuardDuty Findings Result:', gdFindingsResult);
       console.log('GuardDuty Critical Result:', gdCriticalResult);
@@ -96,6 +101,30 @@ const useDashboardData = (timeRange = '24h') => {
       if (!gdFindingsResult.success) {
         console.warn(' GuardDuty findings error:', gdFindingsResult.error);
       }
+
+      // 🆕 NEW: Process EC2 instances - flatten from all regions into single array
+      const ec2Instances = allInstancesResult.success && allInstancesResult.data?.regions
+        ? allInstancesResult.data.regions.flatMap(regionData =>
+            (regionData.instances || []).map(instance => ({
+              ...instance,
+              Region: regionData.region  // Add region to each instance
+            }))
+          )
+        : [];
+
+      console.log(` Processed ${ec2Instances.length} EC2 instances from all regions`);
+
+      // 🆕 NEW: Process GuardDuty findings - flatten from all regions into single array
+      const allFindings = gdFindingsResult.success && gdFindingsResult.data?.regions
+        ? gdFindingsResult.data.regions.flatMap(regionData =>
+            (regionData.findings || []).map(finding => ({
+              ...finding,
+              region: regionData.region  // Add region to each finding
+            }))
+          )
+        : [];
+
+      console.log(` Processed ${allFindings.length} GuardDuty findings from all regions`);
 
       // Create alerts array from GuardDuty critical findings
       const guarddutyAlerts = guarddutyCritical?.findings?.map((finding, index) => ({
@@ -140,11 +169,13 @@ const useDashboardData = (timeRange = '24h') => {
 
       setData({
         ec2Summary: summaryResult.data,
+        ec2Instances,  // NEW: Flattened EC2 instances for table
         ec2Cost: costResult.data,
         guarddutyStatus,
         guarddutyFindings,
         guarddutyCritical,
         guarddutySummary,
+        allFindings,  // NEW: Flattened GuardDuty findings for table
         performance: mockData.performance,
         serviceHealth: mockData.serviceHealth,
         alerts: allAlerts,

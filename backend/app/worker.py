@@ -310,9 +310,118 @@ class CloudHealthWorker:
         except Exception as e:
             logger.error(f"[{self.aws_account_id}] Error collecting S3 metrics: {e}", exc_info=True)
 
-    """# ADDED: Recommendations generation
+    async def collect_cloudwatch_metrics(self):
+        """Collect CloudWatch metrics for EC2 instances"""
+        try:
+            logger.info(f"[{self.aws_account_id}] Collecting CloudWatch metrics...")
+
+            # Get running EC2 instances
+            ec2_summary = self.ec2_scanner.get_instance_summary()
+
+            if not ec2_summary.get('has_instances'):
+                logger.info(f"[{self.aws_account_id}] No EC2 instances found for CloudWatch metrics")
+                return
+
+            # Get all regions with instances
+            all_instances = self.ec2_scanner.scan_all_regions()
+            timestamp = datetime.now()
+            metrics_collected = 0
+
+            for region_data in all_instances.get('regions', []):
+                region = region_data.get('region')
+                instances = region_data.get('instances', [])
+
+                # Only collect metrics for running instances
+                running_instances = [
+                    inst for inst in instances
+                    if inst.get('State', {}).get('Name') == 'running'
+                ]
+
+                if not running_instances:
+                    continue
+
+                logger.info(f"[{self.aws_account_id}] Collecting CloudWatch metrics for {len(running_instances)} running instances in {region}")
+
+                for instance in running_instances:
+                    instance_id = instance.get('InstanceId')
+
+                    try:
+                        # Get CPU utilization
+                        cpu_metrics = self.cloudwatch_scanner.get_ec2_cpu_utilization(
+                            instance_id=instance_id,
+                            hours=1,
+                            region=region
+                        )
+
+                        if cpu_metrics and 'average' in cpu_metrics:
+                            await self.metrics_model.store_metric(
+                                aws_account_id=self.aws_account_id,
+                                service="EC2",
+                                metric_name="CPUUtilization",
+                                value=float(cpu_metrics['average']),
+                                timestamp=timestamp,
+                                unit="Percent",
+                                dimensions={
+                                    "InstanceId": instance_id,
+                                    "Region": region
+                                }
+                            )
+                            metrics_collected += 1
+
+                        # Get network in/out
+                        network_in = self.cloudwatch_scanner.get_ec2_network_in(
+                            instance_id=instance_id,
+                            hours=1,
+                            region=region
+                        )
+
+                        if network_in and 'average' in network_in:
+                            await self.metrics_model.store_metric(
+                                aws_account_id=self.aws_account_id,
+                                service="EC2",
+                                metric_name="NetworkIn",
+                                value=float(network_in['average']),
+                                timestamp=timestamp,
+                                unit="Bytes",
+                                dimensions={
+                                    "InstanceId": instance_id,
+                                    "Region": region
+                                }
+                            )
+                            metrics_collected += 1
+
+                        network_out = self.cloudwatch_scanner.get_ec2_network_out(
+                            instance_id=instance_id,
+                            hours=1,
+                            region=region
+                        )
+
+                        if network_out and 'average' in network_out:
+                            await self.metrics_model.store_metric(
+                                aws_account_id=self.aws_account_id,
+                                service="EC2",
+                                metric_name="NetworkOut",
+                                value=float(network_out['average']),
+                                timestamp=timestamp,
+                                unit="Bytes",
+                                dimensions={
+                                    "InstanceId": instance_id,
+                                    "Region": region
+                                }
+                            )
+                            metrics_collected += 1
+
+                    except Exception as e:
+                        logger.error(f"[{self.aws_account_id}] Error collecting CloudWatch metrics for {instance_id}: {e}")
+                        continue
+
+            logger.info(f"[{self.aws_account_id}] CloudWatch metrics collection completed! ({metrics_collected} metrics)")
+
+        except Exception as e:
+            logger.error(f"[{self.aws_account_id}] Error collecting CloudWatch metrics: {e}", exc_info=True)
+
     async def generate_recommendations(self):
-        Generate cost optimization recommendations
+        """Generate cost optimization recommendations"""
         try:
             logger.info(f"[{self.aws_account_id}] Generating recommendations...")
 
@@ -324,7 +433,7 @@ class CloudHealthWorker:
 
                 if stopped_count > 0:
                     await self.recommendation_model.store_recommendation(
-                        aws_account_id =self.client_id,
+                        aws_account_id=self.aws_account_id,
                         rec_type="cost",
                         title=f"Remove {stopped_count} stopped EC2 instances",
                         description=f"You have {stopped_count} stopped instances incurring EBS costs.",
@@ -336,11 +445,10 @@ class CloudHealthWorker:
                     )
                     recommendations_count += 1
 
-            logger.info(f"[{self.client_id}] Generated {recommendations_count} recommendations!")
+            logger.info(f"[{self.aws_account_id}] Generated {recommendations_count} recommendations!")
 
         except Exception as e:
-            logger.error(f"[{self.client_id}] Error generating recommendations: {e}", exc_info=True)
-            """
+            logger.error(f"[{self.aws_account_id}] Error generating recommendations: {e}", exc_info=True)
 
 
     async def run_collection_cycle(self):
@@ -355,6 +463,7 @@ class CloudHealthWorker:
             await self.collect_cost_data()
             await self.collect_security_findings()
             await self.collect_s3_metrics()
+            await self.collect_cloudwatch_metrics()  # 🆕 NEW: CloudWatch metrics collection
             await self.generate_recommendations()
 
             # Update last collection timestamp

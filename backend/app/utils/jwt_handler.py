@@ -1,10 +1,12 @@
 import jwt
 from datetime import datetime, timedelta
 from app.config import settings
+from logging import getLogger
+logger = getLogger(__name__)
 
 SECRET_KEY = settings.JWT_SECRET_KEY
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60  # 60 minutes
+ACCESS_TOKEN_EXPIRE_MINUTES = 24  # 24 Hours
 REFRESH_TOKEN_EXPIRE_DAYS = 7  # 7 days
 
 
@@ -39,6 +41,18 @@ def decode_access_token(token: str):
         return payload
     except jwt.PyJWTError:
         return None
+
+
+def verify_token(token: str):
+    try:
+        if jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM]):
+            return True
+        else:
+            logger.error(f"Invalid token: {token} ")
+            return False
+    except jwt.ExpiredSignatureError:
+        logger.info(f"JWT token expired")
+        return False
 
 
 def decode_refresh_token(token: str):

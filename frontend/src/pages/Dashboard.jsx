@@ -15,6 +15,8 @@ import Header from '../components/common/Header';
 import Card from '../components/common/Card';
 import MetricsCard from '../components/dashboard/MetricsCard';
 import Loading from '../components/common/Loading';
+import EC2InstancesTable from '../components/dashboard/EC2InstancesTable';
+import GuardDutyFindingsTable from '../components/dashboard/GuardDutyFindingsTable';
 
 const AWSCloudHealthDashboard = () => {
     const [selectedTimeRange, setSelectedTimeRange] = useState('24h');
@@ -110,10 +112,12 @@ const AWSCloudHealthDashboard = () => {
     // 🆕 UPDATED: Added GuardDuty data destructuring
     const {
         ec2Summary,
+        ec2Instances,  // NEW: All EC2 instances for table
         ec2Cost,
         guarddutyStatus,
         guarddutyCritical,
         guarddutySummary,
+        allFindings,  // NEW: All GuardDuty findings for table
         performance,
         serviceHealth,
         alerts,
@@ -335,6 +339,22 @@ const AWSCloudHealthDashboard = () => {
                             </>
                         )}
                     </Card>
+                </section>
+
+                {/* 🆕 NEW: EC2 Instances Table Section */}
+                <section className="animate-slide-up" style={{ animationDelay: '0.2s' }}>
+                    <EC2InstancesTable
+                        instances={ec2Instances || []}
+                        loading={loading}
+                    />
+                </section>
+
+                {/* 🆕 NEW: GuardDuty Findings Table Section */}
+                <section className="animate-slide-up" style={{ animationDelay: '0.3s' }}>
+                    <GuardDutyFindingsTable
+                        findings={allFindings || []}
+                        loading={loading}
+                    />
                 </section>
 
                 {/* Middle Section: Service Health & Performance */}
