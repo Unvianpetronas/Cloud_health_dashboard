@@ -102,26 +102,29 @@ const useDashboardData = (timeRange = '24h') => {
         console.warn(' GuardDuty findings error:', gdFindingsResult.error);
       }
 
-      // 🆕 NEW: Process EC2 instances - flatten from all regions into single array
-      const ec2Instances = allInstancesResult.success && allInstancesResult.data?.regions
-        ? allInstancesResult.data.regions.flatMap(regionData =>
-            (regionData.instances || []).map(instance => ({
+      // 🆕 NEW: Process EC2 instances - get from flat array and add region
+      const ec2Instances = allInstancesResult.success && allInstancesResult.data?.instances
+        ? allInstancesResult.data.instances.map(instance => {
+            // Extract region from Placement.AvailabilityZone (e.g., "us-east-1a" -> "us-east-1")
+            const az = instance.Placement?.AvailabilityZone || '';
+            const region = az.slice(0, -1); // Remove last character (zone letter)
+
+            return {
               ...instance,
-              Region: regionData.region  // Add region to each instance
-            }))
-          )
+              Region: region || 'unknown'  // Add region to each instance
+            };
+          })
         : [];
 
       console.log(` Processed ${ec2Instances.length} EC2 instances from all regions`);
 
-      // 🆕 NEW: Process GuardDuty findings - flatten from all regions into single array
-      const allFindings = gdFindingsResult.success && gdFindingsResult.data?.regions
-        ? gdFindingsResult.data.regions.flatMap(regionData =>
-            (regionData.findings || []).map(finding => ({
-              ...finding,
-              region: regionData.region  // Add region to each finding
-            }))
-          )
+      // 🆕 NEW: Process GuardDuty findings - get from flat array
+      const allFindings = gdFindingsResult.success && gdFindingsResult.data?.findings
+        ? gdFindingsResult.data.findings.map(finding => ({
+            ...finding,
+            // Region is already in finding.region from backend
+            region: finding.region || 'unknown'
+          }))
         : [];
 
       console.log(` Processed ${allFindings.length} GuardDuty findings from all regions`);
