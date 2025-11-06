@@ -2,9 +2,21 @@ import redis
 import json
 import logging
 from typing import Optional, Any
+from datetime import datetime, date
+from decimal import Decimal
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+class DateTimeEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles datetime, date, and Decimal objects"""
+
+    def default(self, obj):
+        if isinstance(obj, (datetime, date)):
+            return obj.isoformat()
+        if isinstance(obj, Decimal):
+            return float(obj)
 
 
 class RedisCache:
@@ -53,7 +65,8 @@ class RedisCache:
             return False
 
         try:
-            self.redis.setex(key, ttl, json.dumps(value))
+            json_data = json.dumps(value, cls=DateTimeEncoder)
+            self.redis.setex(key, ttl, json_data)
             return True
         except Exception as e:
             logger.error(f"Redis SET error: {e}")

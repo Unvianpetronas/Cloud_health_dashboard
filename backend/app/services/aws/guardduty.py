@@ -42,10 +42,15 @@ class GuardDutyScanner(BaseAWSScanner):
                     if result['enabled']:
                         enabled_regions.append(region)
                 except Exception as e:
-                    logger.error(f"Error checking {region}: {e}")
+                    error_str = str(e)
+                    if 'SubscriptionRequiredException' in error_str:
+                        logger.debug(f"GuardDuty not subscribed in {region}")
+                    else:
+                        logger.error(f"Error checking {region}: {e}")
+
                     status_by_region[region] = {
                         'enabled': False,
-                        'error': str(e)
+                        'error': error_str
                     }
 
         return {
