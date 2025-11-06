@@ -144,9 +144,8 @@ async def authenticate(auth_request: AuthRequest, request: Request):
 
 
             client_provider = AWSClientProvider(
-                aws_access_key=auth_request.aws_access_key,
-                aws_secret_key=auth_request.aws_secret_key,
-                aws_region=auth_request.aws_region
+                access_key=auth_request.aws_access_key,
+                secret_key=auth_request.aws_secret_key,
             )
 
 
