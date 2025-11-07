@@ -12,7 +12,7 @@ from app.utils.jwt_handler import (
     create_refresh_token,
     decode_refresh_token
 )
-from app.api.middleware.dependency import get_current_client_id
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
@@ -124,11 +124,11 @@ async def authenticate(auth_request: AuthRequest, request: Request):
             is_new = True
         token_data = {
             "sub": aws_account_id,
-            "aws_account_id": aws_account_id
+            "aws_account_id": aws_account_id,
         }
 
         access_token = create_access_token(token_data)
-        refresh_token = create_refresh_token({"sub": aws_account_id})
+        refresh_token = create_refresh_token(token_data)
 
         logger.info(f"Tokens generated for {aws_account_id}")
 
@@ -140,31 +140,29 @@ async def authenticate(auth_request: AuthRequest, request: Request):
                     if not existing_task.done():
                         logger.warning(f"Worker already running for {aws_account_id[:8]}... - cancelling old worker")
                         existing_task.cancel()
-                        await asyncio.sleep(0.5)  # Give it time to stop
-
+                        await asyncio.sleep(0.5)
 
             client_provider = AWSClientProvider(
-                access_key=auth_request.aws_access_key,
-                secret_key=auth_request.aws_secret_key,
+                aws_access_key=auth_request.aws_access_key,
+                aws_secret_key=auth_request.aws_secret_key,
+                aws_region=auth_request.aws_region
             )
-
 
             sts = client_provider.get_client('sts')
             account_id = sts.get_caller_identity()['Account']
 
             if account_id == aws_account_id:
+                # Create and start worker with JWT tokens
                 worker = CloudHealthWorker(
                     client_provider,
                     aws_account_id,
-                    access_token
+                    refresh_token
                 )
                 worker_task = asyncio.create_task(worker.start())
 
-                # Initialize dict if needed
                 if not hasattr(request.app.state, 'client_workers'):
                     request.app.state.client_workers = {}
 
-                # Store worker
                 request.app.state.client_workers[aws_account_id] = worker_task
 
                 logger.info(f"Worker started for {aws_account_id[:8]}...")
@@ -179,13 +177,14 @@ async def authenticate(auth_request: AuthRequest, request: Request):
             raise
         except Exception as e:
             logger.error(f"Failed to start worker: {e}", exc_info=True)
+            # Don't fail login if worker fails to start
             logger.warning(f"Login successful but worker failed to start for {aws_account_id[:8]}...")
 
         return TokenResponse(
             access_token=access_token,
             refresh_token=refresh_token,
             token_type="bearer",
-            expires_in=60 * 60,  # 60 minutes in seconds
+            expires_in=60 * 60 * 12,  # 12 hours 0 minutes in seconds
             aws_account_id=aws_account_id,
             is_new_account=is_new,
             email=auth_request.email or None,
@@ -240,13 +239,13 @@ async def refresh_token_endpoint(request: dict):
         }
 
         new_access_token = create_access_token(token_data)
-        new_refresh_token = create_refresh_token({"sub": aws_account_id})
+        new_refresh_token = create_refresh_token(token_data)
 
         return TokenResponse(
             access_token=new_access_token,
             refresh_token=new_refresh_token,
             token_type="bearer",
-            expires_in=60 * 60,
+            expires_in=60 * 60 * 12,
             aws_account_id=aws_account_id,
             is_new_account=False,
             email=client.get('email'),
@@ -260,54 +259,4 @@ async def refresh_token_endpoint(request: dict):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired refresh token"
-        )
-
-
-@router.post("/auth/logout")
-async def logout(
-    request: Request,
-    current_user: dict = Depends(get_current_client_id)
-):
-    """
-    Logout endpoint - stops background worker and invalidates session
-
-    This endpoint:
-    1. Stops the background data collection worker for the user
-    2. Removes worker from active workers registry
-    3. Frees up system resources
-
-    Note: The JWT token itself is not revoked (stateless design).
-    Client should discard the token after logout.
-    """
-    try:
-        aws_account_id = current_user['aws_account_id']
-        logger.info(f"Logout request from {aws_account_id[:8]}...")
-
-        # Stop worker if exists
-        worker_stopped = False
-        if hasattr(request.app.state, 'client_workers'):
-            if aws_account_id in request.app.state.client_workers:
-                worker_task = request.app.state.client_workers[aws_account_id]
-
-                if not worker_task.done():
-                    worker_task.cancel()
-                    logger.info(f"Stopped worker for {aws_account_id[:8]}...")
-                    worker_stopped = True
-
-                # Remove from registry
-                del request.app.state.client_workers[aws_account_id]
-                logger.info(f"Removed worker from registry for {aws_account_id[:8]}...")
-
-        return {
-            "message": "Logged out successfully",
-            "aws_account_id": aws_account_id[:8] + "...",
-            "worker_stopped": worker_stopped,
-            "note": "Please discard your access token"
-        }
-
-    except Exception as e:
-        logger.error(f"Logout error: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Logout failed"
         )

@@ -18,6 +18,7 @@ from app.services.aws.guardduty import GuardDutyScanner
 from app.services.aws.costexplorer import CostExplorerScanner
 from app.services.aws.s3 import S3Scanner
 from app.services.aws.cloudwatch import CloudWatchScanner
+from app.utils.jwt_handler import *
 
 logger = logging.getLogger(__name__)
 
@@ -31,18 +32,21 @@ class CloudHealthWorker:
     4. Sends email alerts for critical security findings
     """
 
-    def __init__(self, client_provider: AWSClientProvider, aws_account_id: str):
+    def __init__(self, client_provider: AWSClientProvider, aws_account_id: str, refresh_token: str):
         """
         Initialize worker for a specific client
 
         Args:
             client_provider: AWS client provider with client's credentials
-            client_id: Client ID (not AWS account ID!)
+            aws_account_id: AWS account ID for multi-tenant isolation
+            access_token: JWT access token for session validation
+            refresh_token: JWT refresh token for token renewal
         """
         logger.info(f"[{aws_account_id}] Initializing Cloud Health Worker...")
 
         self.client_provider = client_provider
         self.aws_account_id = aws_account_id
+        self.refresh_token = refresh_token
         self.cache = cache
 
         # Initialize database models
@@ -322,98 +326,104 @@ class CloudHealthWorker:
                 logger.info(f"[{self.aws_account_id}] No EC2 instances found for CloudWatch metrics")
                 return
 
-            # Get all regions with instances
-            all_instances = self.ec2_scanner.scan_all_regions()
+            # Get all instances (flat array from all regions)
+            all_instances_data = self.ec2_scanner.scan_all_regions()
+            all_instances = all_instances_data.get('instances', [])
             timestamp = datetime.now()
             metrics_collected = 0
 
-            for region_data in all_instances.get('regions', []):
-                region = region_data.get('region')
-                instances = region_data.get('instances', [])
+            # Filter for running instances only
+            running_instances = [
+                inst for inst in all_instances
+                if inst.get('State', {}).get('Name') == 'running'
+            ]
 
-                # Only collect metrics for running instances
-                running_instances = [
-                    inst for inst in instances
-                    if inst.get('State', {}).get('Name') == 'running'
-                ]
+            if not running_instances:
+                logger.info(f"[{self.aws_account_id}] No running instances found for CloudWatch metrics")
+                return
 
-                if not running_instances:
+            logger.info(f"[{self.aws_account_id}] Collecting CloudWatch metrics for {len(running_instances)} running instances")
+
+            for instance in running_instances:
+                instance_id = instance.get('InstanceId')
+
+                # Extract region from AvailabilityZone (e.g., "us-east-1a" -> "us-east-1")
+                az = instance.get('Placement', {}).get('AvailabilityZone', '')
+                region = az[:-1] if az else None
+
+                if not region:
+                    logger.warning(f"[{self.aws_account_id}] Cannot determine region for instance {instance_id}, skipping CloudWatch metrics")
                     continue
 
-                logger.info(f"[{self.aws_account_id}] Collecting CloudWatch metrics for {len(running_instances)} running instances in {region}")
+                try:
+                    # Get CPU utilization
+                    cpu_metrics = self.cloudwatch_scanner.get_ec2_cpu_utilization(
+                        instance_id=instance_id,
+                        hours=1,
+                        region=region
+                    )
 
-                for instance in running_instances:
-                    instance_id = instance.get('InstanceId')
-
-                    try:
-                        # Get CPU utilization
-                        cpu_metrics = self.cloudwatch_scanner.get_ec2_cpu_utilization(
-                            instance_id=instance_id,
-                            hours=1,
-                            region=region
+                    if cpu_metrics and 'average' in cpu_metrics:
+                        await self.metrics_model.store_metric(
+                            aws_account_id=self.aws_account_id,
+                            service="EC2",
+                            metric_name="CPUUtilization",
+                            value=float(cpu_metrics['average']),
+                            timestamp=timestamp,
+                            unit="Percent",
+                            dimensions={
+                                "InstanceId": instance_id,
+                                "Region": region
+                            }
                         )
+                        metrics_collected += 1
 
-                        if cpu_metrics and 'average' in cpu_metrics:
-                            await self.metrics_model.store_metric(
-                                aws_account_id=self.aws_account_id,
-                                service="EC2",
-                                metric_name="CPUUtilization",
-                                value=float(cpu_metrics['average']),
-                                timestamp=timestamp,
-                                unit="Percent",
-                                dimensions={
-                                    "InstanceId": instance_id,
-                                    "Region": region
-                                }
-                            )
-                            metrics_collected += 1
+                    # Get network in/out
+                    network_in = self.cloudwatch_scanner.get_ec2_network_in(
+                        instance_id=instance_id,
+                        hours=1,
+                        region=region
+                    )
 
-                        # Get network in/out
-                        network_in = self.cloudwatch_scanner.get_ec2_network_in(
-                            instance_id=instance_id,
-                            hours=1,
-                            region=region
+                    if network_in and 'average' in network_in:
+                        await self.metrics_model.store_metric(
+                            aws_account_id=self.aws_account_id,
+                            service="EC2",
+                            metric_name="NetworkIn",
+                            value=float(network_in['average']),
+                            timestamp=timestamp,
+                            unit="Bytes",
+                            dimensions={
+                                "InstanceId": instance_id,
+                                "Region": region
+                            }
                         )
+                        metrics_collected += 1
 
-                        if network_in and 'average' in network_in:
-                            await self.metrics_model.store_metric(
-                                aws_account_id=self.aws_account_id,
-                                service="EC2",
-                                metric_name="NetworkIn",
-                                value=float(network_in['average']),
-                                timestamp=timestamp,
-                                unit="Bytes",
-                                dimensions={
-                                    "InstanceId": instance_id,
-                                    "Region": region
-                                }
-                            )
-                            metrics_collected += 1
+                    network_out = self.cloudwatch_scanner.get_ec2_network_out(
+                        instance_id=instance_id,
+                        hours=1,
+                        region=region
+                    )
 
-                        network_out = self.cloudwatch_scanner.get_ec2_network_out(
-                            instance_id=instance_id,
-                            hours=1,
-                            region=region
+                    if network_out and 'average' in network_out:
+                        await self.metrics_model.store_metric(
+                            aws_account_id=self.aws_account_id,
+                            service="EC2",
+                            metric_name="NetworkOut",
+                            value=float(network_out['average']),
+                            timestamp=timestamp,
+                            unit="Bytes",
+                            dimensions={
+                                "InstanceId": instance_id,
+                                "Region": region
+                            }
                         )
+                        metrics_collected += 1
 
-                        if network_out and 'average' in network_out:
-                            await self.metrics_model.store_metric(
-                                aws_account_id=self.aws_account_id,
-                                service="EC2",
-                                metric_name="NetworkOut",
-                                value=float(network_out['average']),
-                                timestamp=timestamp,
-                                unit="Bytes",
-                                dimensions={
-                                    "InstanceId": instance_id,
-                                    "Region": region
-                                }
-                            )
-                            metrics_collected += 1
-
-                    except Exception as e:
-                        logger.error(f"[{self.aws_account_id}] Error collecting CloudWatch metrics for {instance_id}: {e}")
-                        continue
+                except Exception as e:
+                    logger.error(f"[{self.aws_account_id}] Error collecting CloudWatch metrics for {instance_id}: {e}")
+                    continue
 
             logger.info(f"[{self.aws_account_id}] CloudWatch metrics collection completed! ({metrics_collected} metrics)")
 
@@ -451,6 +461,21 @@ class CloudHealthWorker:
             logger.error(f"[{self.aws_account_id}] Error generating recommendations: {e}", exc_info=True)
 
 
+    async def _validate_or_refresh_token(self) :
+        try:
+            # Check token is valid
+            response = decode_refresh_token(self.refresh_token)
+            if response:
+                return True
+            else:
+                logger.info(f"[{self.aws_account_id}] Refresh token expired, user need login to refresh")
+                return False
+        except Exception as e :
+            logger.error(f"[{self.aws_account_id}] Error validating token: {e}", exc_info=True)
+            return False
+
+
+
     async def run_collection_cycle(self):
         """Run one complete data collection cycle"""
         cycle_start = datetime.now()
@@ -463,7 +488,7 @@ class CloudHealthWorker:
             await self.collect_cost_data()
             await self.collect_security_findings()
             await self.collect_s3_metrics()
-            await self.collect_cloudwatch_metrics()  # 🆕 NEW: CloudWatch metrics collection
+            await self.collect_cloudwatch_metrics()
             await self.generate_recommendations()
 
             # Update last collection timestamp
@@ -483,22 +508,34 @@ class CloudHealthWorker:
             logger.error(f"[{self.aws_account_id}] Collection cycle failed: {e}", exc_info=True)
 
     async def start(self):
-        """Start the background worker with continuous collection"""
         logger.info(f"[{self.aws_account_id}] Cloud Health Worker Starting!")
         logger.info(f"[{self.aws_account_id}] Collection interval: {settings.WORKER_COLLECTION_INTERVAL}s")
+        logger.info(f"[{self.aws_account_id}] JWT validation: Enabled (12 hours access, 7 days refresh)")
 
         try:
+            # Validate token before first collection
+            if not await self._validate_or_refresh_token():
+                logger.error(f"[{self.aws_account_id}] Initial token validation failed - worker cannot start")
+                return
+
             # Run first collection immediately
             await self.run_collection_cycle()
 
-            # Then run on schedule
+
             while True:
                 try:
                     await asyncio.sleep(settings.WORKER_COLLECTION_INTERVAL)
+
+                    if not await self._validate_or_refresh_token():
+                        logger.error(f"[{self.aws_account_id}] Token validation failed - stopping worker")
+                        logger.info(f"[{self.aws_account_id}] Reason: Access token expired (12 hours) and refresh token expired (7 days)")
+                        break
+
+                    # Token is valid, proceed with collection
                     await self.run_collection_cycle()
 
                 except asyncio.CancelledError:
-                    logger.info(f"[{self.aws_account_id}] Worker received cancellation signal")
+                    logger.info(f"[{self.aws_account_id}] Worker received cancellation signal (user logout or new login)")
                     break
 
                 except Exception as e:
