@@ -10,6 +10,7 @@ from app.database.dynamodb import DynamoDBConnection
 from app.worker import CloudHealthWorker
 from app.scheduler.notification_scheduler import notification_scheduler
 from app.scheduler.critical_alert_monitor import critical_alert_monitor
+from app.api.routes import analytics
 
 # Configure logging
 logging.basicConfig(
@@ -131,7 +132,7 @@ app.include_router(auth.router, prefix="/api/v1", tags=["Authentication"])
 app.include_router(ec2.router, prefix="/api/v1", tags=["EC2"])
 app.include_router(guardduty.router, prefix="/api/v1", tags=["GuardDuty"])
 app.include_router(email.router, prefix="/api/v1", tags=["Email"])
-
+app.include_router(analytics.router, prefix="/api/v1", tags=["Analytics"])
 
 @app.get("/")
 async def root():
