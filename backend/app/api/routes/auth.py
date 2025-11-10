@@ -143,10 +143,10 @@ async def authenticate(auth_request: AuthRequest, request: Request):
                         await asyncio.sleep(0.5)
 
             client_provider = AWSClientProvider(
-                aws_access_key=auth_request.aws_access_key,
-                aws_secret_key=auth_request.aws_secret_key,
-                aws_region=auth_request.aws_region
-            )
+                                                auth_request.aws_access_key,
+                                                auth_request.aws_secret_key,
+                                                auth_request.aws_region
+                                                )
 
             sts = client_provider.get_client('sts')
             account_id = sts.get_caller_identity()['Account']

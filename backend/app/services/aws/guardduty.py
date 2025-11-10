@@ -85,6 +85,32 @@ class GuardDutyScanner(BaseAWSScanner):
             raise Exception(f"Error in {region}: {str(e)}")
 
     @BaseAWSScanner.with_retry()
+    def scan_all_regions(self, severity_filter: int = 4) -> Dict[str, Any]:
+        """
+        Scan all regions for GuardDuty findings.
+        Compatible format for architecture analyzer.
+
+        Returns:
+            Dict with 'regions' key containing list of region data
+        """
+        all_findings_data = self.get_all_findings(severity_filter)
+
+        # Transform findings_by_region dict to regions list
+        regions = []
+        for region, region_data in all_findings_data.get('findings_by_region', {}).items():
+            regions.append({
+                'region': region,
+                'findings': region_data.get('findings', []),
+                'count': region_data.get('count', 0)
+            })
+
+        return {
+            'regions': regions,
+            'total_findings': all_findings_data.get('total_count', 0),
+            'enabled_regions': all_findings_data.get('enabled_regions', [])
+        }
+
+    @BaseAWSScanner.with_retry()
     def get_all_findings(self, severity_filter: int = 4) -> Dict[str, Any]:
         status = self.check_all_regions_status()
         enabled_regions = status['enabled_regions']

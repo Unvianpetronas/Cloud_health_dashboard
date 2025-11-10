@@ -108,13 +108,105 @@ class S3Scanner(BaseAWSScanner):
 
         for b in buckets:
             storage = self.get_bucket_storage_metrics(b["bucket"], b["region"])
+            is_public = self._check_public_buckets(b["bucket"])
             results.append({
                 "bucket": b["bucket"],
                 "region": b["region"],
-                "metrics": storage
+                "metrics": storage,
+                "security" : is_public
             })
 
         return {
             "total_buckets": len(results),
             "buckets": results
         }
+
+    def list_all_buckets(self) -> Dict:
+        """
+        Scan all buckets and return in format expected by architecture analyzer.
+        """
+        buckets = self.list_buckets()
+        results = []
+
+        for b in buckets:
+            storage = self.get_bucket_storage_metrics(b["bucket"], b["region"])
+            security_info = self._check_public_buckets(b["bucket"])
+            encryption_enabled = self._check_bucket_encryption(b["bucket"])
+
+            results.append({
+                "Name": b["bucket"],
+                "Region": b["region"],
+                "encryption_enabled": encryption_enabled,
+                "public_access": security_info["is_public"],
+                "size_bytes": storage.get("StandardStorageBytes", 0),
+                "object_count": storage.get("ObjectCount", 0)
+            })
+
+        return {
+            "total_buckets": len(results),
+            "buckets": results
+        }
+
+    def _check_public_buckets (self, bucket_name : str):
+        """
+        Check if a bucket is public or not.
+        """
+        client = self.client_provider.get_client("s3")
+        is_public = False
+        reasons = []
+
+        try:
+            response = client.get_public_access_block(Bucket=bucket_name)
+            conf = response.get("PublicAccessBlockConfiguration", {})
+            if conf.get("BlockPublicAcls") and conf.get("BlockPublicPolicy") and conf.get("IgnorePublicAcls") and conf.get("RestrictPublicBuckets"):
+                pass
+            else:
+                pass
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'NoSuchPublicAccessBlockConfiguration':
+                reasons.append("No Public Access Block configuration found (High Risk)")
+            else:
+                logger.warning(f"Could not check Public Access Block for {bucket_name}: {e}")
+        try:
+            response = client.get_bucket_acl(Bucket=bucket_name)
+            for grant in response.get('Grants', []):
+                grantee = grant.get('Grantee', {})
+                if grantee.get('Type') == 'Group':
+                    uri = grantee.get('URI', '')
+                    if 'AllUsers' in uri or 'AuthenticatedUsers' in uri:
+                        is_public = True
+                        reasons.append(f"ACL allows {uri.split('/')[-1]}")
+        except ClientError as e:
+            logger.warning(f" Error checking ACL for {bucket_name}: {e}")
+
+        try:
+            policy_status = client.get_bucket_policy_status(Bucket=bucket_name)
+            if policy_status.get('PolicyStatus', {}).get('IsPublic'):
+                is_public = True
+                reasons.append("Bucket Policy allows public access")
+        except ClientError as e:
+            if e.response['Error']['Code'] != 'NoSuchBucketPolicy':
+                logger.warning(f"Could not check Bucket Policy Status for {bucket_name}: {e}")
+
+        return {
+            "is_public": is_public,
+            "reasons": reasons
+        }
+
+    def _check_bucket_encryption(self, bucket_name: str) -> bool:
+        """
+        Check if bucket has encryption enabled.
+
+        Returns:
+            bool: True if encryption enabled, False otherwise
+        """
+        try:
+            client = self.client_provider.get_client("s3")
+            response = client.get_bucket_encryption(Bucket=bucket_name)
+            return True  # If no exception, encryption is configured
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'ServerSideEncryptionConfigurationNotFoundError':
+                return False
+            else:
+                logger.warning(f"Could not check encryption for {bucket_name}: {e}")
+                return False  # Assume not encrypted if can't check

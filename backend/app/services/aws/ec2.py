@@ -267,4 +267,3 @@ class EC2Scanner(BaseAWSScanner):
             "has_instances": True
         }
 
-

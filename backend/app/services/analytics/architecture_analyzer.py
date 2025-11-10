@@ -1,27 +1,19 @@
-"""
-Comprehensive Architecture Analyzer
-Analyzes cloud architecture across multiple dimensions:
-- AWS Well-Architected Framework (5 pillars)
-- Cost optimization opportunities
-- Performance metrics and bottlenecks
-- Security posture
-- Reliability and fault tolerance
-"""
-
-from typing import Dict, List, Any, Optional
-from datetime import datetime, timedelta
+import logging
 import statistics
+from datetime import datetime
+from typing import List, Dict, Any
+logger = logging.getLogger(__name__)
 
-
-class ArchitectureAnalyzer:
+class ArchitectureAnalyzer :
     """
-    Main architecture analysis engine that combines multiple evaluation dimensions
-    to provide comprehensive insights to customers.
+    Analyzes architecture of a client's AWS account
     """
 
-    def __init__(self, client_id: str):
+    def __init__(self, client_id : str):
         self.client_id = client_id
         self.analysis_timestamp = datetime.utcnow()
+
+
 
     async def analyze_full_architecture(
             self,
@@ -154,63 +146,78 @@ class ArchitectureAnalyzer:
             ])
         }
 
-    def _evaluate_operational_excellence(self, ec2_data: List[Dict]) -> float:
-        """Evaluate operational excellence based on tagging, monitoring, etc."""
+    async def _evaluate_operational_excellence(self, ec2_data: List[Dict]) -> float:
+        """
+        Evaluates the operational excellence of the client's AWS account.
+
+        Args:
+            ec2_data (List[Dict]): List of EC2 instances
+
+        Returns:
+            float: Operational excellence score
+        """
+        score = 100.0
         if not ec2_data:
-            return 70.0  # Neutral score if no data
+            return 70.0      # If not have any information, return 70.0
 
-        score = 100.0
+        total_instances = len(ec2_data)
+        tagged_instances = sum(1 for instance in ec2_data if instance.get('tags') and len(instance.get('tags',[])) > 0 )
 
-        # Check tagging practices
-        tagged_instances = sum(
-            1 for instance in ec2_data
-            if instance.get('tags') and len(instance.get('tags', [])) > 0
-        )
-        tagging_ratio = tagged_instances / len(ec2_data) if ec2_data else 0
-
-        # Tagging is crucial for operational excellence
-        if tagging_ratio < 0.5:
+        ratio = tagged_instances / total_instances if total_instances > 0 else 0
+        if ratio < 0.5:
             score -= 20
-        elif tagging_ratio < 0.8:
-            score -= 10
+        elif ratio < 0.8:
+             score -= 10
 
-        # Check for instances in multiple regions (disaster recovery consideration)
-        regions = set(instance.get('region', 'us-east-1') for instance in ec2_data)
-        if len(regions) == 1:
-            score -= 15  # Single region is a risk
+        Region = set(instance.get('region') for instance in ec2_data)
+        if len(Region) < 2:
+            score -= 15
 
         return max(0, min(100, score))
 
-    def _evaluate_security_pillar(
-            self,
-            security_findings: List[Dict],
-            ec2_data: List[Dict],
-            s3_data: List[Dict]
-    ) -> float:
-        """Evaluate security posture."""
+
+    async def _evaluate_security_pillar(self,
+                                        security_findings: List[Dict],
+                                        s3_data: List[Dict]
+                                        ) :
+        """
+        Evaluates the security of the client's AWS account.
+
+        Args:
+            security_findings (List[Dict]): List of security findings
+            s3_data (List[Dict]): List of S3 buckets
+
+        Returns:
+            float: Security score
+        """
         score = 100.0
+        if not security_findings and not s3_data:
+            return 70.0
 
-        # Deduct points for security findings
-        critical_count = sum(1 for f in security_findings if f.get('severity') == 'CRITICAL')
-        high_count = sum(1 for f in security_findings if f.get('severity') == 'HIGH')
-        medium_count = sum(1 for f in security_findings if f.get('severity') == 'MEDIUM')
+        critical_findings = sum(1 for finding in security_findings if finding.get('severity') == 'CRITICAL')
+        high_findings = sum(1 for finding in security_findings if finding.get('severity') == 'HIGH')
+        medium_findings = sum(1 for finding in security_findings if finding.get('severity') == 'MEDIUM')
 
-        score -= (critical_count * 15)  # -15 per critical finding
-        score -= (high_count * 8)  # -8 per high finding
-        score -= (medium_count * 3)  # -3 per medium finding
+        score -= (critical_findings * 15)
+        score -= (high_findings * 8)
+        score -= (medium_findings * 3)
 
-        # Check for public S3 buckets (security risk)
-        public_buckets = sum(
-            1 for bucket in s3_data
-            if bucket.get('public_access', False)
-        )
-        if public_buckets > 0:
-            score -= (public_buckets * 10)
+        buckets_public = sum(1 for bucket in s3_data if bucket.get('public_access', False))
+        score -= (buckets_public * 10)
 
         return max(0, min(100, score))
 
-    def _evaluate_reliability_pillar(self, ec2_data: List[Dict]) -> float:
-        """Evaluate reliability and fault tolerance."""
+
+    async def _evaluate_reliability_pillar(self, ec2_data: List[Dict]):
+        """
+        Evaluates the reliability of the client's AWS account.
+
+        Args:
+            ec2_data (List[Dict]): List of EC2 instances
+
+        Returns:
+            float: Reliability score
+        """
         if not ec2_data:
             return 70.0
 
@@ -674,3 +681,4 @@ class ArchitectureAnalyzer:
         summary += f"Review the {len(recommendations)} recommendations below to improve your architecture."
 
         return summary
+
