@@ -1,10 +1,7 @@
 import asyncio
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, Optional
-from decimal import Decimal
+from typing import Dict
 from app.services.cache_client.redis_client import cache
-from app.config import settings
 from app.database.models import (
     ClientModel,
     MetricsModel,
@@ -18,6 +15,7 @@ from app.services.aws.guardduty import GuardDutyScanner
 from app.services.aws.costexplorer import CostExplorerScanner
 from app.services.aws.s3 import S3Scanner
 from app.services.aws.cloudwatch import CloudWatchScanner
+from app.services.analytics.architecture_analyzer import ArchitectureAnalyzer
 from app.utils.jwt_handler import *
 
 logger = logging.getLogger(__name__)
@@ -430,36 +428,115 @@ class CloudHealthWorker:
         except Exception as e:
             logger.error(f"[{self.aws_account_id}] Error collecting CloudWatch metrics: {e}", exc_info=True)
 
-    async def generate_recommendations(self):
-        """Generate cost optimization recommendations"""
+    async def collect_architecture_analysis(self):
+        """
+        Run comprehensive architecture analysis and cache results.
+
+        Collects data from all AWS services, transforms it, runs ArchitectureAnalyzer,
+        and caches the results for API consumption.
+        """
         try:
-            logger.info(f"[{self.aws_account_id}] Generating recommendations...")
+            logger.info(f"[{self.aws_account_id}] Running architecture analysis...")
 
-            recommendations_count = 0
-            ec2_summary = self.ec2_scanner.get_instance_summary()
+            # Collect data from all scanners
+            ec2_report = self.ec2_scanner.scan_all_regions()
+            s3_report = self.s3_scanner.list_all_buckets()
+            guardduty_report = self.guardduty_scanner.scan_all_regions()
 
-            if ec2_summary.get('has_instances'):
-                stopped_count = ec2_summary.get('by_state', {}).get('stopped', 0)
+            # Get cost data for last 30 days
+            end_date = datetime.now().date()
+            start_date = end_date - timedelta(days=30)
+            cost_report = self.cost_scanner.get_total_cost(
+                start_date=start_date.strftime('%Y-%m-%d'),
+                end_date=end_date.strftime('%Y-%m-%d')
+            )
 
-                if stopped_count > 0:
-                    await self.recommendation_model.store_recommendation(
-                        aws_account_id=self.aws_account_id,
-                        rec_type="cost",
-                        title=f"Remove {stopped_count} stopped EC2 instances",
-                        description=f"You have {stopped_count} stopped instances incurring EBS costs.",
-                        impact="MEDIUM",
-                        effort="LOW",
-                        confidence=0.9,
-                        service="EC2",
-                        estimated_savings=stopped_count * 10.0
+            # Transform EC2 data
+            ec2_instances = []
+            for instance in ec2_report.get('instances', []):
+                az = instance.get('Placement', {}).get('AvailabilityZone', '')
+                region = az[:-1] if az else 'unknown'
+
+                ec2_instances.append({
+                    'instance_id': instance.get('InstanceId'),
+                    'instance_type': instance.get('InstanceType'),
+                    'state': instance.get('State', {}).get('Name'),
+                    'region': region,
+                    'availability_zone': az,
+                    'tags': instance.get('Tags', [])
+                })
+
+            # Transform S3 data
+            s3_buckets = []
+            for bucket in s3_report.get('buckets', []):
+                s3_buckets.append({
+                    'name': bucket.get('Name'),
+                    'region': bucket.get('Region', 'us-east-1'),
+                    'encryption_enabled': bucket.get('encryption_enabled', False),
+                    'public_access': bucket.get('public_access', False),
+                    'size_bytes': bucket.get('size_bytes', 0),
+                    'object_count': bucket.get('object_count', 0)
+                })
+
+            # Transform security findings
+            security_findings = []
+            for region_data in guardduty_report.get('regions', []):
+                for finding in region_data.get('findings', []):
+                    security_findings.append({
+                        'id': finding.get('finding_id'),
+                        'title': finding.get('title', 'Security Finding'),
+                        'severity': finding.get('severity_label', 'MEDIUM'),
+                        'type': finding.get('type'),
+                        'region': region_data.get('region')
+                    })
+
+            # Process cost data
+            cost_data = {
+                'total_cost': cost_report.get('total_cost', 0),
+                'by_service': cost_report.get('by_service', {})
+            }
+
+            # Get CloudWatch metrics (sample from first instance)
+            cloudwatch_metrics = {}
+            if ec2_instances:
+                try:
+                    instance_id = ec2_instances[0].get('instance_id')
+                    region = ec2_instances[0].get('region', 'us-east-1')
+
+                    cpu_metrics = self.cloudwatch_scanner.get_metric_statistics(
+                        region=region,
+                        namespace='AWS/EC2',
+                        metric_name='CPUUtilization',
+                        dimensions={'Name': 'InstanceId', 'Value': instance_id},
+                        period=3600
                     )
-                    recommendations_count += 1
+                    cloudwatch_metrics['CPUUtilization'] = cpu_metrics
+                except Exception as e:
+                    logger.warning(f"[{self.aws_account_id}] Could not fetch CloudWatch metrics: {e}")
+                    cloudwatch_metrics = {}
 
-            logger.info(f"[{self.aws_account_id}] Generated {recommendations_count} recommendations!")
+            # Run architecture analysis
+            analyzer = ArchitectureAnalyzer(client_id=self.aws_account_id)
+
+            analysis_report = await analyzer.analyze_full_architecture(
+                ec2_data=ec2_instances,
+                s3_data=s3_buckets,
+                cost_data=cost_data,
+                security_findings=security_findings,
+                cloudwatch_metrics=cloudwatch_metrics
+            )
+
+            # Cache results for 1 hour (same as architecture.py route)
+            cache_key = f'architecture:analysis:{self.aws_account_id}'
+            self.cache.set(cache_key, analysis_report, ttl=3600)
+
+            logger.info(
+                f"[{self.aws_account_id}] Architecture analysis complete! "
+                f"Overall score: {analysis_report.get('overall_score', 0)}/100"
+            )
 
         except Exception as e:
-            logger.error(f"[{self.aws_account_id}] Error generating recommendations: {e}", exc_info=True)
-
+            logger.error(f"[{self.aws_account_id}] Error running architecture analysis: {e}", exc_info=True)
 
     async def _validate_or_refresh_token(self) :
         try:
@@ -489,7 +566,7 @@ class CloudHealthWorker:
             await self.collect_security_findings()
             await self.collect_s3_metrics()
             await self.collect_cloudwatch_metrics()
-            await self.generate_recommendations()
+            await self.collect_architecture_analysis()
 
             # Update last collection timestamp
             await self.client_model.update_last_collection(self.aws_account_id)

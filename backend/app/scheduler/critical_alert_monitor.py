@@ -156,7 +156,7 @@ class CriticalAlertMonitor:
             Formatted alert data for email template
         """
         return {
-            'severity': finding.get('Severity', 'HIGH'),
+            'severity': self._get_severity_label(finding.get('severity',7.0)),
             'title': finding.get('Title', 'Security Issue Detected'),
             'description': finding.get('Description', 'A critical security issue was detected'),
             'service': finding.get('Service', {}).get('ServiceName', 'Unknown'),
@@ -182,6 +182,20 @@ class CriticalAlertMonitor:
                 return buckets[0].get('Name', 'N/A')
 
         return 'N/A'
+
+    def _get_severity_label(self, severity) -> str:
+        """Convert numeric GuardDuty severity to string label"""
+        if isinstance(severity, str):
+            return severity.upper()
+
+        if severity >= 7.0:
+            return 'CRITICAL'
+        elif severity >= 4.0:
+            return 'HIGH'
+        elif severity >= 2.0:
+            return 'MEDIUM'
+        else:
+            return 'LOW'
 
     def start(self, interval_minutes: int = 10):
         """

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.services.aws.client import AWSClientProvider
 from app.services.aws.securityhub import SecurityHubScanner
 from app.api.middleware.dependency import get_aws_client_provider
-from app.services.cache.redis_client import cache
+from app.services.cache_client.redis_client import cache
 import asyncio
 import logging
 

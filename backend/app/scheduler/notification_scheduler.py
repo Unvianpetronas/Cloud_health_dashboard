@@ -138,7 +138,7 @@ class NotificationScheduler:
             start_time = end_time - timedelta(hours=24)
 
             # Get findings count by severity
-            findings = scanner.get_findings_sumary(
+            findings = scanner.get_findings_summary(
                 start_time=start_time.isoformat(),
                 end_time=end_time.isoformat()
             )
