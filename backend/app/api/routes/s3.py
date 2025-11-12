@@ -36,7 +36,8 @@ async def list_buckets(
         return {**result, "source": "aws", "cache": False}
     except Exception as e:
         logger.exception("Error listing S3 buckets")
-        raise HTTPException(status_code=500, detail=f"S3 bucket list error: {str(e)}")
+        logger.error(f"Internal error details: {e}", exc_info=True)  # Log details
+        raise HTTPException(status_code=500, detail="An error occurred processing your request")
 
 
 @router.get("/s3/bucket/metrics", tags=["S3"])

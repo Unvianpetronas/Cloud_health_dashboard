@@ -167,18 +167,19 @@ class GuardDutyScanner(BaseAWSScanner):
 
             detector_id = detectors[0]
 
-            findings_response = client.list_findings(
-                DetectorId=detector_id,
-                FindingCriteria={
-                    'Criterion': {
-                        'severity': {'Gte': severity_filter},
-                        'service.archived': {'Eq': ['false']}
-                    }
-                },
-                MaxResults=50
-            )
+            finding_ids = []
+            paginator = client.get_paginator('list_findings')
+            for page in paginator.paginate(
+                    DetectorId=detector_id,
+                    FindingCriteria={
+                        'Criterion': {
+                            'severity': {'Gte': severity_filter},
+                            'service.archived': {'Eq': ['false']}
+                        }
+                    },
+            ):
+             finding_ids.extend(page.get('FindingIds', []))
 
-            finding_ids = findings_response.get('FindingIds', [])
             if not finding_ids:
                 return []
 

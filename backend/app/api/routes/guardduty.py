@@ -33,8 +33,9 @@ async def check_guardduty_status(
         return {**status, "cached": False}
 
     except Exception as e:
-        logger.error(f"Status check error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Status check guardduty error: {e}")
+        logger.error(f"Internal error details: {e}", exc_info=True)  # Log details
+        raise HTTPException(status_code=500, detail="An error occurred processing your request")
 
 
 @router.get("/guardduty/findings", tags=["GuardDuty"])

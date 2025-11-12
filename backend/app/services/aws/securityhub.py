@@ -2,6 +2,8 @@ import logging
 from typing import List, Dict
 from concurrent.futures import ThreadPoolExecutor
 from botocore.exceptions import ClientError
+
+from .base_scanner import BaseAWSScanner
 from .client import AWSClientProvider
 
 logger = logging.getLogger(__name__)
@@ -20,7 +22,7 @@ class SecurityHubScanner:
             client_provider (AWSClientProvider): Factory để tạo các AWS client.
         """
         self.client_provider = client_provider
-
+    @BaseAWSScanner.with_retry()
     def _get_findings_in_one_region(self, region: str) -> List[Dict]:
         """
         Hàm "worker": Lấy tất cả Security Hub findings từ một region.
@@ -39,6 +41,7 @@ class SecurityHubScanner:
             logger.error(f"Lỗi không xác định ở region {region}: {e}")
             return []
 
+    @BaseAWSScanner.with_retry()
     def scan_all_regions(self) -> Dict:
         """
         Hàm "Quản lý": Quét Security Hub findings trên tất cả các region có sẵn.

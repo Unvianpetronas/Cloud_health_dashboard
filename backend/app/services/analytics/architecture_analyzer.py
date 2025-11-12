@@ -146,7 +146,7 @@ class ArchitectureAnalyzer :
             ])
         }
 
-    async def _evaluate_operational_excellence(self, ec2_data: List[Dict]) -> float:
+    def _evaluate_operational_excellence(self, ec2_data: List[Dict]) -> float:
         """
         Evaluates the operational excellence of the client's AWS account.
 

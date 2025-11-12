@@ -1,9 +1,8 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Any
 from .client import AWSClientProvider
 from .base_scanner import BaseAWSScanner
-from botocore.exceptions import ClientError
 import logging
 
 

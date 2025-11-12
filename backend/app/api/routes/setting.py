@@ -70,12 +70,7 @@ async def update_notification_preferences(
         if preferences.daily_summary and not client.get('email_verified', False):
             raise HTTPException(
                 status_code=400,
-                detail={
-                    "error": "Email verification required",
-                    "message": "Please verify your email before enabling daily summary notifications",
-                    "email": client.get('email'),
-                    "aws_account_id": client.get('aws_account_id')
-                }
+                detail=f"Email verification required. Please verify your email before enabling notifications."
             )
 
         # UPDATE PREFERENCES IN DATABASE

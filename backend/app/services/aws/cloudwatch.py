@@ -1,6 +1,6 @@
 import logging
-from typing import List, Dict, Optional
-from datetime import datetime, timedelta
+from typing import List, Dict
+from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from botocore.exceptions import ClientError
 from .client import AWSClientProvider

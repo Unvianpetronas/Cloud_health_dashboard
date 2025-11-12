@@ -4,8 +4,6 @@ from app.database.models import ClientModel
 from app.api.middleware.dependency import get_current_client_id
 from datetime import datetime, timedelta
 from app.services.email.ses_client import SESEmailService
-from app.scheduler import notification_scheduler
-from app.scheduler.critical_alert_monitor import critical_alert_monitor
 import logging
 import secrets
 

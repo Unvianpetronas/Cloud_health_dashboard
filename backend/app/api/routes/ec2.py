@@ -37,7 +37,8 @@ async def scan_all_ec2_instances(
             'cache_client' : False
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Scan error: {str(e)}")
+        logger.error(f"Internal error details: {e}", exc_info=True)  # Log details
+        raise HTTPException(status_code=500, detail="An error occurred processing your request")
 
 @router.get("/ec2/running-instances", tags=["EC2"])
 async def get_running_instances(
