@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import authApi from '../services/authApi';
+import logger from '../utils/logger';
 
 const AuthContext = createContext();
 
@@ -24,11 +25,14 @@ export const AuthProvider = ({ children }) => {
 
     if (token && userData) {
       try {
-        setUser(JSON.parse(userData));
+        const parsedUser = JSON.parse(userData);
+        setUser(parsedUser);
         setIsAuthenticated(true);
+        logger.info('User restored from localStorage:', parsedUser.awsAccountId);
       } catch (e) {
-        console.error('Failed to parse user data:', e);
+        logger.error('Failed to parse user data:', e);
         localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
         localStorage.removeItem('user');
       }
     }
@@ -42,7 +46,7 @@ export const AuthProvider = ({ children }) => {
       const result = await authApi.login(credentials);
 
       if (result.success) {
-        // ✅ Extract all data from backend response
+        // Extract all data from backend response
         const {
           access_token,
           refresh_token,
@@ -54,15 +58,14 @@ export const AuthProvider = ({ children }) => {
           company_name
         } = result.data;
 
-        // ✅ Store JWT token
+        // Store JWT tokens
         localStorage.setItem('access_token', access_token);
 
-        // ✅ Store refresh token (for token refresh later)
         if (refresh_token) {
           localStorage.setItem('refresh_token', refresh_token);
         }
 
-        // ✅ Create user data object with backend response
+        // Create user data object with backend response
         const userData = {
           awsAccountId: aws_account_id,
           email: email || null,
@@ -76,7 +79,7 @@ export const AuthProvider = ({ children }) => {
         setUser(userData);
         setIsAuthenticated(true);
 
-        console.log('✅ Login successful:', {
+        logger.info('Login successful:', {
           awsAccountId: aws_account_id,
           email: email,
           companyName: company_name
@@ -88,7 +91,7 @@ export const AuthProvider = ({ children }) => {
         return { success: false, error: result.error };
       }
     } catch (error) {
-      console.error('Login error:', error);
+      logger.error('Login error:', error);
       const errorMessage = 'Network error. Please check your connection.';
       setError(errorMessage);
       return { success: false, error: errorMessage };
@@ -104,6 +107,7 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     setIsAuthenticated(false);
     setError(null);
+    logger.info('User logged out');
   };
 
   const clearError = () => {

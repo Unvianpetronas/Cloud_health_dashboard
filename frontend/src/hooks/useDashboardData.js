@@ -2,18 +2,19 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { ec2Api } from '../services/ec2Api';
 import { guarddutyApi } from '../services/guarddutyApi';
+import logger from '../utils/logger';
 
 const useDashboardData = (timeRange = '24h') => {
   const { isAuthenticated } = useAuth();
   const [data, setData] = useState({
     ec2Summary: null,
-    ec2Instances: null,  // NEW: All EC2 instances for table
+    ec2Instances: null,
     ec2Cost: null,
     guarddutyStatus: null,
     guarddutyFindings: null,
     guarddutyCritical: null,
     guarddutySummary: null,
-    allFindings: null,  // NEW: Flattened GuardDuty findings for table
+    allFindings: null,
     performance: null,
     serviceHealth: null,
     alerts: null,
@@ -44,21 +45,21 @@ const useDashboardData = (timeRange = '24h') => {
 
   const fetchDashboardData = useCallback(async () => {
     if (!isAuthenticated) {
-      console.log('️ Not authenticated, skipping API calls');
+      logger.debug('Not authenticated, skipping API calls');
       return;
     }
 
-    console.log(' Fetching dashboard data...');
+    logger.info('Fetching dashboard data...');
     setLoading(true);
     setError(null);
 
     try {
       // Fetch REAL EC2 and GuardDuty data in parallel
-      console.log(' Calling EC2 and GuardDuty APIs...');
+      logger.debug('Calling EC2 and GuardDuty APIs...');
       const [
         summaryResult,
         costResult,
-        allInstancesResult,  // NEW: Fetch all EC2 instances
+        allInstancesResult,
         gdStatusResult,
         gdFindingsResult,
         gdCriticalResult,
@@ -66,20 +67,20 @@ const useDashboardData = (timeRange = '24h') => {
       ] = await Promise.all([
         ec2Api.getInstanceSummary(),
         ec2Api.getCostEstimate(),
-        ec2Api.scanAllRegions(),  // NEW: Scan all regions for EC2 instances
+        ec2Api.scanAllRegions(),
         guarddutyApi.getStatus(),
         guarddutyApi.getFindings(),
         guarddutyApi.getCritical(),
         guarddutyApi.getSummary()
       ]);
 
-      console.log(' EC2 Summary Result:', summaryResult);
-      console.log(' EC2 Cost Result:', costResult);
-      console.log(' EC2 All Instances Result:', allInstancesResult);
-      console.log(' GuardDuty Status Result:', gdStatusResult);
-      console.log(' GuardDuty Findings Result:', gdFindingsResult);
-      console.log('GuardDuty Critical Result:', gdCriticalResult);
-      console.log(' GuardDuty Summary Result:', gdSummaryResult);
+      logger.debug('EC2 Summary Result:', summaryResult);
+      logger.debug('EC2 Cost Result:', costResult);
+      logger.debug('EC2 All Instances Result:', allInstancesResult);
+      logger.debug('GuardDuty Status Result:', gdStatusResult);
+      logger.debug('GuardDuty Findings Result:', gdFindingsResult);
+      logger.debug('GuardDuty Critical Result:', gdCriticalResult);
+      logger.debug('GuardDuty Summary Result:', gdSummaryResult);
 
       // Check for critical errors (EC2)
       if (!summaryResult.success) {
@@ -96,13 +97,13 @@ const useDashboardData = (timeRange = '24h') => {
       const guarddutySummary = gdSummaryResult.success ? gdSummaryResult.data : null;
 
       if (!gdStatusResult.success) {
-        console.warn(' GuardDuty status error:', gdStatusResult.error);
+        logger.warn('GuardDuty status error:', gdStatusResult.error);
       }
       if (!gdFindingsResult.success) {
-        console.warn(' GuardDuty findings error:', gdFindingsResult.error);
+        logger.warn('GuardDuty findings error:', gdFindingsResult.error);
       }
 
-      // 🆕 NEW: Process EC2 instances - get from flat array and add region
+      // Process EC2 instances - get from flat array and add region
       const ec2Instances = allInstancesResult.success && allInstancesResult.data?.instances
         ? allInstancesResult.data.instances.map(instance => {
             // Extract region from Placement.AvailabilityZone (e.g., "us-east-1a" -> "us-east-1")
@@ -116,18 +117,17 @@ const useDashboardData = (timeRange = '24h') => {
           })
         : [];
 
-      console.log(` Processed ${ec2Instances.length} EC2 instances from all regions`);
+      logger.debug(`Processed ${ec2Instances.length} EC2 instances from all regions`);
 
-      // 🆕 NEW: Process GuardDuty findings - get from flat array
+      // Process GuardDuty findings - get from flat array
       const allFindings = gdFindingsResult.success && gdFindingsResult.data?.findings
         ? gdFindingsResult.data.findings.map(finding => ({
             ...finding,
-            // Region is already in finding.region from backend
             region: finding.region || 'unknown'
           }))
         : [];
 
-      console.log(` Processed ${allFindings.length} GuardDuty findings from all regions`);
+      logger.debug(`Processed ${allFindings.length} GuardDuty findings from all regions`);
 
       // Create alerts array from GuardDuty critical findings
       const guarddutyAlerts = guarddutyCritical?.findings?.map((finding, index) => ({
@@ -172,13 +172,13 @@ const useDashboardData = (timeRange = '24h') => {
 
       setData({
         ec2Summary: summaryResult.data,
-        ec2Instances,  // NEW: Flattened EC2 instances for table
+        ec2Instances,
         ec2Cost: costResult.data,
         guarddutyStatus,
         guarddutyFindings,
         guarddutyCritical,
         guarddutySummary,
-        allFindings,  // NEW: Flattened GuardDuty findings for table
+        allFindings,
         performance: mockData.performance,
         serviceHealth: mockData.serviceHealth,
         alerts: allAlerts,
@@ -186,39 +186,39 @@ const useDashboardData = (timeRange = '24h') => {
       });
 
       setLastUpdated(new Date());
-      console.log(' Dashboard data loaded successfully');
+      logger.info('Dashboard data loaded successfully');
 
     } catch (err) {
       const errorMessage = err.message || 'Failed to fetch dashboard data';
       setError(errorMessage);
-      console.error(' Error fetching dashboard data:', err);
+      logger.error('Error fetching dashboard data:', err);
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, timeRange]);
+  }, [isAuthenticated]);
 
   useEffect(() => {
-    console.log(' useDashboardData mounted, isAuthenticated:', isAuthenticated);
+    logger.debug('useDashboardData mounted, isAuthenticated:', isAuthenticated);
     fetchDashboardData();
   }, [fetchDashboardData]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    console.log(' Setting up auto-refresh (5 min)');
+    logger.info('Setting up auto-refresh (5 min)');
     const interval = setInterval(() => {
-      console.log(' Auto-refreshing dashboard...');
+      logger.info('Auto-refreshing dashboard...');
       fetchDashboardData();
     }, 5 * 60 * 1000);
 
     return () => {
-      console.log(' Cleaning up auto-refresh');
+      logger.debug('Cleaning up auto-refresh');
       clearInterval(interval);
     };
   }, [fetchDashboardData, isAuthenticated]);
 
   const refresh = useCallback(() => {
-    console.log(' Manual refresh triggered');
+    logger.info('Manual refresh triggered');
     fetchDashboardData();
   }, [fetchDashboardData]);
 
