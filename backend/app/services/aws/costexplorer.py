@@ -16,6 +16,7 @@ class CostExplorerScanner(BaseAWSScanner):
     def __init__(self, client_provider: AWSClientProvider):
         self.client = client_provider.get_client("ce")
 
+    @BaseAWSScanner.with_retry()
     def get_total_cost(self, start_date: str, end_date: str, granularity: str = "MONTHLY") -> Dict:
         """
         Tổng chi phí trong khoảng thời gian.

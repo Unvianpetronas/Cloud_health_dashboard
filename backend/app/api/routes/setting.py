@@ -69,7 +69,7 @@ async def update_notification_preferences(
         # CHECK: If trying to enable daily_summary, email must be verified
         if preferences.daily_summary and not client.get('email_verified', False):
             raise HTTPException(
-                status_code=400,
+                status_code=500,
                 detail=f"Email verification required. Please verify your email before enabling notifications."
             )
 

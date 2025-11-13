@@ -43,6 +43,7 @@ class GuardDutyScanner(BaseAWSScanner):
                         enabled_regions.append(region)
                 except Exception as e:
                     error_str = str(e)
+                    # SubscriptionRequiredException is expected when GuardDuty isn't enabled in a region
                     if 'SubscriptionRequiredException' in error_str:
                         logger.debug(f"GuardDuty not subscribed in {region}")
                     else:
@@ -178,18 +179,28 @@ class GuardDutyScanner(BaseAWSScanner):
                         }
                     },
             ):
-             finding_ids.extend(page.get('FindingIds', []))
+                finding_ids.extend(page.get('FindingIds', []))
 
             if not finding_ids:
                 return []
 
-            details = client.get_findings(
-                DetectorId=detector_id,
-                FindingIds=finding_ids
-            )
+            all_finding_details = []
+
+            # Loop through finding_ids in chunks of 50
+            for i in range(0, len(finding_ids), 50):
+                id_chunk = finding_ids[i:i + 50]
+
+                # Call get_findings ONLY for that chunk
+                details = client.get_findings(
+                    DetectorId=detector_id,
+                    FindingIds=id_chunk
+                )
+
+                # Add the results from this chunk to our main list
+                all_finding_details.extend(details.get('Findings', []))
 
             formatted = []
-            for finding in details.get('Findings', []):
+            for finding in all_finding_details:
                 formatted.append({
                     'finding_id': finding['Id'],
                     'type': finding['Type'],
