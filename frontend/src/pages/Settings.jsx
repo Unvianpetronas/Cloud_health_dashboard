@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
-import { Settings as SettingsIcon, Save, User, Bell, Shield, Palette, CheckCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Save, User, Bell, Shield, Palette, Mail } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Header from '../components/common/Header';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
+import Toast from '../components/common/Toast';
+import { settingsApi } from '../services/settingsApi';
+import logger from '../utils/logger';
 
 const Settings = () => {
   const { user } = useAuth();
@@ -17,18 +20,48 @@ const Settings = () => {
     },
     dashboard: {
       autoRefresh: true,
-      refreshInterval: 300, // 5 minutes
+      refreshInterval: 300,
       theme: 'dark',
       defaultTimeRange: '24h'
     },
     security: {
-      sessionTimeout: 3600, // 1 hour
+      sessionTimeout: 3600,
       requireReauth: false
     }
   });
 
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  // Load settings on mount
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    setLoading(true);
+    const result = await settingsApi.getSettings();
+
+    if (result.success) {
+      setSettings(result.data);
+      logger.info('Settings loaded successfully');
+    } else {
+      showToast(result.error, 'error');
+      logger.error('Failed to load settings:', result.error);
+    }
+
+    setLoading(false);
+  };
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+  };
+
+  const hideToast = () => {
+    setToast(null);
+  };
 
   const handleSettingChange = (category, key, value) => {
     setSettings(prev => ({
@@ -38,23 +71,52 @@ const Settings = () => {
         [key]: value
       }
     }));
-    setSaved(false);
   };
 
   const handleSave = async () => {
     setSaving(true);
-    // TODO: Implement API call to save settings
-    // await api.put('/settings', settings);
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    const result = await settingsApi.updateSettings(settings);
+
+    if (result.success) {
+      showToast('Settings saved successfully!', 'success');
+      logger.info('Settings saved');
+    } else {
+      showToast(result.error, 'error');
+      logger.error('Failed to save settings:', result.error);
+    }
 
     setSaving(false);
-    setSaved(true);
-
-    // Hide success message after 3 seconds
-    setTimeout(() => setSaved(false), 3000);
   };
+
+  const handleSendTestEmail = async () => {
+    setSendingEmail(true);
+
+    const result = await settingsApi.sendTestEmail();
+
+    if (result.success) {
+      showToast(result.message, 'success');
+      logger.info('Test email sent');
+    } else {
+      showToast(result.error, 'error');
+      logger.error('Failed to send test email:', result.error);
+    }
+
+    setSendingEmail(false);
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-cosmic-bg-0">
+        <Header title="Settings" showNavigation={true} />
+        <main className="p-6 max-w-4xl mx-auto">
+          <div className="flex items-center justify-center h-96">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-cosmic-bg-0">
@@ -66,16 +128,13 @@ const Settings = () => {
           <p className="text-cosmic-txt-2">Manage your dashboard preferences and account settings</p>
         </div>
 
-        {/* Success Message */}
-        {saved && (
-          <div className="mb-6 animate-scale-in">
-            <div className="card bg-green-900/20 border-green-500/50 p-4">
-              <div className="flex items-center space-x-3">
-                <CheckCircle className="h-5 w-5 text-green-400" />
-                <p className="text-green-400 font-medium">Settings saved successfully!</p>
-              </div>
-            </div>
-          </div>
+        {/* Toast Notifications */}
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={hideToast}
+          />
         )}
 
         <div className="space-y-6">
@@ -120,11 +179,32 @@ const Settings = () => {
 
           {/* Notification Settings */}
           <Card className="animate-fade-in" style={{animationDelay: '0.1s'}}>
-            <div className="flex items-center mb-6">
-              <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl flex items-center justify-center mr-3 shadow-cosmic-glow">
-                <Bell className="h-5 w-5 text-white" />
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center">
+                <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl flex items-center justify-center mr-3 shadow-cosmic-glow">
+                  <Bell className="h-5 w-5 text-white" />
+                </div>
+                <h2 className="text-xl font-semibold text-cosmic-txt-1">Notifications</h2>
               </div>
-              <h2 className="text-xl font-semibold text-cosmic-txt-1">Notifications</h2>
+              <Button
+                onClick={handleSendTestEmail}
+                disabled={sendingEmail}
+                variant="ghost"
+                size="sm"
+                className="flex items-center space-x-2"
+              >
+                {sendingEmail ? (
+                  <>
+                    <div className="animate-spin rounded-full h-3 w-3 border-2 border-blue-500 border-t-transparent"></div>
+                    <span>Sending...</span>
+                  </>
+                ) : (
+                  <>
+                    <Mail size={14} />
+                    <span>Send Test Email</span>
+                  </>
+                )}
+              </Button>
             </div>
 
             <div className="space-y-4">
