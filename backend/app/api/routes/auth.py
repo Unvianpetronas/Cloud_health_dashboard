@@ -18,11 +18,11 @@ router = APIRouter()
 
 
 class AuthRequest(BaseModel):
-    aws_access_key: str = Field(..., min_length=16, max_length=128)
-    aws_secret_key: str = Field(..., min_length=16, max_length=128)
-    aws_region: str = Field(default="us-east-1")
-    email: Optional[EmailStr] = Field(None)
-    company_name: Optional[str] = Field(None)
+    aws_access_key: str = Field(..., min_length=16, max_length=128, description="AWS Access Key ID (typically 20 characters)")
+    aws_secret_key: str = Field(..., min_length=32, max_length=128, description="AWS Secret Access Key (typically 40 characters)")
+    aws_region: str = Field(default="us-east-1", description="AWS Region")
+    email: Optional[EmailStr] = Field(None, description="Email address for notifications")
+    company_name: Optional[str] = Field(None, description="Company name")
 
 
 class TokenResponse(BaseModel):

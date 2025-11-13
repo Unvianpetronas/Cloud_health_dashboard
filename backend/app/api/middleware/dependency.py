@@ -6,20 +6,30 @@ from app.services.aws.client import AWSClientProvider
 import logging
 logger = logging.getLogger(__name__)
 
-# Dòng này định nghĩa cách FastAPI sẽ tìm token: trong header "Authorization: Bearer <token>"
+# OAuth2 scheme for JWT token authentication
+# Tokens are extracted from the Authorization header: "Bearer <token>"
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
 async def get_aws_client_provider(token: str = Depends(oauth2_scheme)) -> AWSClientProvider:
     """
-    Đây là một dependency:
-    1. Yêu cầu và xác thực JWT token.
-    2. Nếu hợp lệ, nó tạo và trả về một instance của AWSClientProvider đã được xác thực.
-    Bất kỳ endpoint nào "phụ thuộc" vào hàm này sẽ được bảo vệ.
+    FastAPI dependency for AWS client authentication.
+
+    This dependency:
+    1. Requires and validates JWT token from request
+    2. If valid, creates and returns an authenticated AWSClientProvider instance
+    3. Protects any endpoint that depends on this function
+
+    Returns:
+        AWSClientProvider: Authenticated AWS client provider
+
+    Raises:
+        HTTPException: 401 if token is invalid or client not found
+        HTTPException: 403 if account is not active
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Không thể xác thực thông tin đăng nhập",
+        detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
 
