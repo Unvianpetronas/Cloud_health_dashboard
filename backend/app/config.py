@@ -49,7 +49,7 @@ class BaseConfig(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
 
     #Secrets Manager
-    USE_SECRETS_MANAGER: bool = True
+    USE_SECRETS_MANAGER: bool = False  # Disabled - using DynamoDB only for credential storage
 
     #Security Monitoring
     ENABLE_RATE_LIMITING: bool = True
