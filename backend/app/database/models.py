@@ -23,6 +23,7 @@ class ClientModel(BaseModel):
         super().__init__()
         self.table = self.db.get_table(settings.CLIENTS_TABLE)
         self.use_secrets_manager = getattr(settings, 'USE_SECRETS_MANAGER', False)
+        self.secrets_manager = None  # Always initialize to avoid AttributeError
         if self.use_secrets_manager:
             self.secrets_manager = get_secrets_manager()
             logger.info("Secrets Manager enabled (hybrid mode)")
@@ -125,7 +126,7 @@ class ClientModel(BaseModel):
                 return None
 
             credentials_from_sm = False
-            if self.use_secrets_manager or client.get('use_secrets_manager'):
+            if (self.use_secrets_manager or client.get('use_secrets_manager')) and self.secrets_manager:
                 try:
                     creds = self.secrets_manager.get_credentials(aws_account_id)
                     if creds:
@@ -172,7 +173,7 @@ class ClientModel(BaseModel):
 
             credentials_from_sm = False
 
-            if self.use_secrets_manager or client.get('use_secrets_manager'):
+            if (self.use_secrets_manager or client.get('use_secrets_manager')) and self.secrets_manager:
                 try:
                     creds = self.secrets_manager.get_credentials(aws_account_id)
                     if creds:
@@ -216,7 +217,7 @@ class ClientModel(BaseModel):
             aws_account_id = client['aws_account_id']
             credentials_from_sm = False
 
-            if self.use_secrets_manager or client.get('use_secrets_manager'):
+            if (self.use_secrets_manager or client.get('use_secrets_manager')) and self.secrets_manager:
                 try:
                     creds = self.secrets_manager.get_credentials(aws_account_id)
                     if creds:
@@ -257,7 +258,7 @@ class ClientModel(BaseModel):
                     aws_account_id = item['aws_account_id']
                     credentials_from_sm = False
 
-                    if self.use_secrets_manager or item.get('use_secrets_manager'):
+                    if (self.use_secrets_manager or item.get('use_secrets_manager')) and self.secrets_manager:
                         try:
                             creds = self.secrets_manager.get_credentials(aws_account_id)
                             if creds:
