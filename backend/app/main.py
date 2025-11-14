@@ -5,7 +5,7 @@ import logging
 import time
 import asyncio
 from app.config import settings
-from app.api.routes import auth, ec2, guardduty, email, architecture
+from app.api.routes import auth, ec2, guardduty, email, architecture, setting
 from app.database.dynamodb import DynamoDBConnection
 from app.scheduler.notification_scheduler import notification_scheduler
 from app.scheduler.critical_alert_monitor import critical_alert_monitor
@@ -154,6 +154,7 @@ app.include_router(ec2.router, prefix="/api/v1", tags=["EC2"])
 app.include_router(guardduty.router, prefix="/api/v1", tags=["GuardDuty"])
 app.include_router(email.router, prefix="/api/v1", tags=["Email"])
 app.include_router(architecture.router, prefix="/api/v1", tags=["Architecture"])
+app.include_router(setting.router, prefix="/api/v1", tags=["Settings"])
 
 
 @app.get("/")

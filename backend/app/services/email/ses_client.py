@@ -737,6 +737,181 @@ class SESEmailService:
             logger.error(f"Failed to send daily summary: {e}", exc_info=True)
             return False
 
+    async def send_test_notification(self,
+                                     recipient_email: str,
+                                     client_name: str,
+                                     aws_account_id: str) -> bool:
+        """
+        Send a test email to verify email notification settings
+
+        Args:
+            recipient_email: Email address to send to
+            client_name: Name of the client/company
+            aws_account_id: AWS account ID
+
+        Returns:
+            bool: True if email sent successfully, False otherwise
+        """
+        try:
+            # HTML email template
+            html_body = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    body {{
+                        font-family: Arial, sans-serif;
+                        line-height: 1.6;
+                        color: #333;
+                        max-width: 600px;
+                        margin: 0 auto;
+                        padding: 20px;
+                    }}
+                    .header {{
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        color: white;
+                        padding: 30px;
+                        text-align: center;
+                        border-radius: 10px 10px 0 0;
+                    }}
+                    .content {{
+                        background: #f9f9f9;
+                        padding: 30px;
+                        border-radius: 0 0 10px 10px;
+                    }}
+                    .test-badge {{
+                        display: inline-block;
+                        background: #10b981;
+                        color: white;
+                        padding: 5px 15px;
+                        border-radius: 20px;
+                        font-size: 14px;
+                        margin: 10px 0;
+                    }}
+                    .info-box {{
+                        background: white;
+                        padding: 15px;
+                        border-radius: 5px;
+                        margin: 15px 0;
+                        border-left: 4px solid #667eea;
+                    }}
+                    .button {{
+                        display: inline-block;
+                        padding: 12px 24px;
+                        background: #667eea;
+                        color: white;
+                        text-decoration: none;
+                        border-radius: 5px;
+                        margin-top: 15px;
+                    }}
+                    .footer {{
+                        text-align: center;
+                        margin-top: 30px;
+                        padding-top: 20px;
+                        border-top: 1px solid #ddd;
+                        color: #666;
+                        font-size: 12px;
+                    }}
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>🎉 Test Email Successful!</h1>
+                    <div class="test-badge">✓ Email Notifications Working</div>
+                </div>
+
+                <div class="content">
+                    <h2>Hello, {client_name}!</h2>
+
+                    <p>This is a test email to confirm that your email notification settings are working correctly.</p>
+
+                    <div class="info-box">
+                        <strong>📧 Email Configuration</strong><br>
+                        Recipient: {recipient_email}<br>
+                        AWS Account: {aws_account_id}<br>
+                        Status: <span style="color: #10b981;">✓ Active</span>
+                    </div>
+
+                    <p>You will receive notifications for:</p>
+                    <ul>
+                        <li>🔴 Critical security alerts</li>
+                        <li>🟡 Warning notifications</li>
+                        <li>📊 Daily summary reports (if enabled)</li>
+                        <li>💰 Cost optimization recommendations</li>
+                    </ul>
+
+                    <p>If you received this email, your notification system is set up correctly!</p>
+
+                    <center>
+                        <a href="{self.frontend_url}/settings" class="button">Manage Settings</a>
+                    </center>
+                </div>
+
+                <div class="footer">
+                    <p>© 2025 AWS Cloud Health Dashboard</p>
+                    <p>This is an automated test email from your cloud monitoring system.</p>
+                </div>
+            </body>
+            </html>
+            """
+
+            # Plain text version
+            text_body = f"""
+            Test Email - AWS Cloud Health Dashboard
+
+            Hello, {client_name}!
+
+            This is a test email to confirm that your email notification settings are working correctly.
+
+            Email Configuration:
+            - Recipient: {recipient_email}
+            - AWS Account: {aws_account_id}
+            - Status: Active
+
+            You will receive notifications for:
+            - Critical security alerts
+            - Warning notifications
+            - Daily summary reports (if enabled)
+            - Cost optimization recommendations
+
+            If you received this email, your notification system is set up correctly!
+
+            Manage your settings: {self.frontend_url}/settings
+
+            © 2025 AWS Cloud Health Dashboard
+            """
+
+            # Send email
+            response = self.ses.send_email(
+                Source=self.sender_email,
+                Destination={'ToAddresses': [recipient_email]},
+                Message={
+                    'Subject': {
+                        'Data': '✓ Test Email - Your Notifications Are Working!',
+                        'Charset': 'UTF-8'
+                    },
+                    'Body': {
+                        'Html': {
+                            'Data': html_body,
+                            'Charset': 'UTF-8'
+                        },
+                        'Text': {
+                            'Data': text_body,
+                            'Charset': 'UTF-8'
+                        }
+                    }
+                }
+            )
+
+            logger.info(f"Test email sent to {recipient_email}")
+            logger.debug(f"SES Response: {response}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to send test email: {e}", exc_info=True)
+            return False
+
 
 
 

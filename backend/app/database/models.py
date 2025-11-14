@@ -402,6 +402,37 @@ class ClientModel(BaseModel):
             logger.error(f"Error updating notification preferences: {e}")
             return False
 
+    async def update_settings(self, aws_account_id: str, settings: Dict) -> bool:
+        """
+        Update user settings (notifications, dashboard, security)
+
+        Args:
+            aws_account_id: AWS account ID
+            settings: Dictionary containing settings {notifications, dashboard, security}
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            self.table.update_item(
+                Key={'pk': f"CLIENT#{aws_account_id}", 'sk': 'METADATA'},
+                UpdateExpression='SET settings = :settings, updated_at = :updated',
+                ExpressionAttributeValues={
+                    ':settings': settings,
+                    ':updated': datetime.now().isoformat()
+                }
+            )
+
+            # Invalidate cache
+            self.cache.delete(f"client:{aws_account_id}")
+
+            logger.info(f"Updated settings for {aws_account_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error updating settings: {e}", exc_info=True)
+            return False
+
     async def delete_client(self, aws_account_id: str) -> bool:
         """
         Delete client from BOTH places:

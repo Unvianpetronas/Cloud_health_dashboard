@@ -14,6 +14,10 @@ import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Settings from './pages/Settings';
+import Architecture from './pages/Architecture';
+import S3Buckets from './pages/S3Buckets';
+import CostExplorer from './pages/CostExplorer';
+import NotFound from './pages/NotFound';
 
 // Import utilities
 import { createStarfield } from './utils/starfield';
@@ -48,15 +52,40 @@ function App() {
                     </ProtectedRoute>
                   } 
                 />
-                <Route 
-                  path="/settings" 
+                <Route
+                  path="/settings"
                   element={
                     <ProtectedRoute>
                       <Settings />
                     </ProtectedRoute>
-                  } 
+                  }
                 />
-                {/* Add more protected routes as needed */}
+                <Route
+                  path="/architecture"
+                  element={
+                    <ProtectedRoute>
+                      <Architecture />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/s3"
+                  element={
+                    <ProtectedRoute>
+                      <S3Buckets />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/costs"
+                  element={
+                    <ProtectedRoute>
+                      <CostExplorer />
+                    </ProtectedRoute>
+                  }
+                />
+                {/* 404 - Catch all unmatched routes */}
+                <Route path="*" element={<NotFound />} />
               </Routes>
             </div>
           </Router>

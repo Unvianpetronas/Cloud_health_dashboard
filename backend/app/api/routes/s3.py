@@ -17,7 +17,7 @@ async def list_buckets(
         client_provider: AWSClientProvider = Depends(get_aws_client_provider)
 ):
     """
-    Liệt kê tất cả các S3 buckets trong tài khoản và region của chúng.
+    List all S3 buckets in the account and their regions.
     """
     try:
         cache_key = "s3:buckets:list"
@@ -42,13 +42,13 @@ async def list_buckets(
 
 @router.get("/s3/bucket/metrics", tags=["S3"])
 async def get_bucket_metrics(
-        bucket_name: str = Query(..., description="Tên bucket S3 cần lấy metrics"),
-        region: str = Query(..., description="Region của bucket"),
+        bucket_name: str = Query(..., description="S3 bucket name to get metrics for"),
+        region: str = Query(..., description="Region of the bucket"),
         force_refresh: bool = False,
         client_provider: AWSClientProvider = Depends(get_aws_client_provider)
 ):
     """
-    Lấy thông tin metric (storage size & object count) cho 1 bucket cụ thể.
+    Get metric information (storage size & object count) for a specific bucket.
     """
     try:
         cache_key = f"s3:metrics:{bucket_name}:{region}"
@@ -76,8 +76,8 @@ async def get_s3_summary(
         client_provider: AWSClientProvider = Depends(get_aws_client_provider)
 ):
     """
-    Quét toàn bộ S3 buckets và lấy metrics song song cho từng bucket.
-    Trả về tổng quan toàn bộ usage S3.
+    Scan all S3 buckets and get metrics in parallel for each bucket.
+    Returns comprehensive S3 usage overview.
     """
     try:
         cache_key = "s3:summary:all"
@@ -89,12 +89,12 @@ async def get_s3_summary(
         scanner = S3Scanner(client_provider)
         loop = asyncio.get_running_loop()
 
-        # Step 1: Lấy danh sách buckets
+        # Step 1: Get list of buckets
         buckets = await loop.run_in_executor(None, scanner.list_buckets)
         if not buckets:
             return {"total_buckets": 0, "buckets": [], "source": "aws", "cache": False}
 
-        # Step 2: Quét metrics song song
+        # Step 2: Scan metrics in parallel
         def fetch_metrics(b):
             return {
                 "bucket": b["bucket"],
