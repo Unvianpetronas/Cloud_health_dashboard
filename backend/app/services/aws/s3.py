@@ -8,8 +8,8 @@ logger = logging.getLogger(__name__)
 
 class S3Scanner(BaseAWSScanner):
     """
-    Quét thông tin về S3 buckets: tên, region, storage usage.
-    Hữu ích cho monitoring và cost optimization.
+    Scans S3 bucket information: name, region, storage usage.
+    Useful for monitoring and cost optimization.
     """
 
     def __init__(self, client_provider: AWSClientProvider):
@@ -18,7 +18,7 @@ class S3Scanner(BaseAWSScanner):
     @BaseAWSScanner.with_retry()
     def list_buckets(self) -> List[Dict]:
         """
-        Liệt kê tất cả buckets + region.
+        List all buckets with their regions.
         """
         try:
             client = self.client_provider.get_client("s3")
@@ -33,7 +33,7 @@ class S3Scanner(BaseAWSScanner):
                     region_resp = client.get_bucket_location(Bucket=bucket_name)
                     region = region_resp.get("LocationConstraint") or "us-east-1"
                 except ClientError as e:
-                    logger.error(f"Lỗi khi lấy region của bucket {bucket_name}: {e}")
+                    logger.error(f"Error getting bucket region for {bucket_name}: {e}")
                     region = "unknown"
 
                 results.append({
@@ -43,13 +43,13 @@ class S3Scanner(BaseAWSScanner):
 
             return results
         except ClientError as e:
-            logger.error(f"Lỗi khi list buckets: {e}")
+            logger.error(f"Error listing buckets: {e}")
             return []
 
     @BaseAWSScanner.with_retry()
     def get_bucket_storage_metrics(self, bucket_name: str, region: str) -> Dict:
         """
-        Lấy metric về storage size & object count từ CloudWatch.
+        Get storage size and object count metrics from CloudWatch.
         """
         try:
             cloudwatch = self.client_provider.get_client("cloudwatch", region_name=region)
@@ -95,13 +95,13 @@ class S3Scanner(BaseAWSScanner):
             return metrics
 
         except ClientError as e:
-            logger.error(f"Lỗi khi lấy metric cho bucket {bucket_name}: {e}")
+            logger.error(f"Error getting metrics for bucket {bucket_name}: {e}")
             return {}
 
     @BaseAWSScanner.with_retry()
     def scan_all_buckets(self) -> Dict:
         """
-        Quét toàn bộ buckets trong account + thêm storage metrics.
+        Scan all buckets in account with storage metrics.
         """
         buckets = self.list_buckets()
         results = []

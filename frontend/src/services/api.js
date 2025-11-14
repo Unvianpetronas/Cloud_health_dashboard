@@ -10,7 +10,7 @@ const apiClient = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
-    timeout: 30000,
+    timeout: 30000, // 30 seconds - sufficient since worker now starts in background
 });
 
 // Request interceptor

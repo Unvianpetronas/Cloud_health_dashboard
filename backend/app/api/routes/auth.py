@@ -153,19 +153,20 @@ async def authenticate(auth_request: AuthRequest, request: Request):
 
             if account_id == aws_account_id:
                 # Create and start worker with JWT tokens
+                # Use 5-second delay to prevent blocking login response
                 worker = CloudHealthWorker(
                     client_provider,
                     aws_account_id,
                     refresh_token
                 )
-                worker_task = asyncio.create_task(worker.start())
+                worker_task = asyncio.create_task(worker.start(initial_delay=5))
 
                 if not hasattr(request.app.state, 'client_workers'):
                     request.app.state.client_workers = {}
 
                 request.app.state.client_workers[aws_account_id] = worker_task
 
-                logger.info(f"Worker started for {aws_account_id[:8]}...")
+                logger.info(f"Worker scheduled for {aws_account_id[:8]}... (starts in 5s)")
             else:
                 logger.error(f"Account ID mismatch: {account_id} != {aws_account_id}")
                 raise HTTPException(

@@ -586,10 +586,20 @@ class CloudHealthWorker:
         except Exception as e:
             logger.error(f"[{self.aws_account_id}] Collection cycle failed: {e}", exc_info=True)
 
-    async def start(self):
+    async def start(self, initial_delay: int = 5):
+        """
+        Start the worker with an optional initial delay.
+
+        Args:
+            initial_delay: Seconds to wait before first collection (default: 5)
+                          This prevents blocking the login response.
+        """
         logger.info(f"[{self.aws_account_id}] Cloud Health Worker Starting!")
         logger.info(f"[{self.aws_account_id}] Collection interval: {settings.WORKER_COLLECTION_INTERVAL}s")
         logger.info(f"[{self.aws_account_id}] JWT validation: Enabled (12 hours access, 7 days refresh)")
+
+        if initial_delay > 0:
+            logger.info(f"[{self.aws_account_id}] Initial collection will start in {initial_delay} seconds...")
 
         try:
             # Validate token before first collection
@@ -597,7 +607,11 @@ class CloudHealthWorker:
                 logger.error(f"[{self.aws_account_id}] Initial token validation failed - worker cannot start")
                 return
 
-            # Run first collection immediately
+            # Wait before first collection to allow login response to return quickly
+            if initial_delay > 0:
+                await asyncio.sleep(initial_delay)
+
+            # Run first collection
             await self.run_collection_cycle()
 
 
