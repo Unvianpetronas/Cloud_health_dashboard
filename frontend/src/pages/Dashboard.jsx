@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import useDashboardData from '../hooks/useDashboardData';
 import {
     LineChart, Line, AreaChart, Area, BarChart, Bar,
@@ -8,7 +9,7 @@ import {
 import {
     Activity, AlertTriangle, CheckCircle, Cloud, DollarSign,
     Monitor, RefreshCw, Server, Shield, Zap, TrendingUp,
-    ChevronDown, ChevronUp
+    ChevronDown, ChevronUp, Database, ArrowRight
 } from 'lucide-react';
 
 import Header from '../components/common/Header';
@@ -252,6 +253,78 @@ const AWSCloudHealthDashboard = () => {
                             style={{ animationDelay: `${index * 0.1}s` }}
                         />
                     ))}
+                </section>
+
+                {/* Services Quick Access */}
+                <section className="animate-slide-up" style={{animationDelay: '0.5s'}}>
+                    <h3 className="text-lg font-semibold text-cosmic-txt-1 mb-4 flex items-center">
+                        <Cloud size={20} className="mr-2 text-blue-400" />
+                        AWS Services
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Architecture Analysis Card */}
+                        <Link to="/architecture">
+                            <Card className="p-6 hover:scale-105 transition-all cursor-pointer border-2 border-transparent hover:border-blue-500">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center shadow-cosmic-glow">
+                                        <Shield className="h-6 w-6 text-white" />
+                                    </div>
+                                    <ArrowRight className="h-5 w-5 text-cosmic-txt-2" />
+                                </div>
+                                <h4 className="text-lg font-semibold text-cosmic-txt-1 mb-2">Architecture Analysis</h4>
+                                <p className="text-sm text-cosmic-txt-2 mb-3">
+                                    AWS Well-Architected Framework assessment with recommendations
+                                </p>
+                                <div className="flex items-center space-x-2">
+                                    <div className="bg-blue-500/20 px-3 py-1 rounded-lg text-xs text-blue-400 font-semibold">
+                                        View Report
+                                    </div>
+                                </div>
+                            </Card>
+                        </Link>
+
+                        {/* S3 Buckets Card */}
+                        <Link to="/s3">
+                            <Card className="p-6 hover:scale-105 transition-all cursor-pointer border-2 border-transparent hover:border-purple-500">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-cosmic-glow">
+                                        <Database className="h-6 w-6 text-white" />
+                                    </div>
+                                    <ArrowRight className="h-5 w-5 text-cosmic-txt-2" />
+                                </div>
+                                <h4 className="text-lg font-semibold text-cosmic-txt-1 mb-2">S3 Buckets</h4>
+                                <p className="text-sm text-cosmic-txt-2 mb-3">
+                                    Monitor S3 storage, encryption, and access across all regions
+                                </p>
+                                <div className="flex items-center space-x-2">
+                                    <div className="bg-purple-500/20 px-3 py-1 rounded-lg text-xs text-purple-400 font-semibold">
+                                        View Buckets
+                                    </div>
+                                </div>
+                            </Card>
+                        </Link>
+
+                        {/* Cost Explorer Card */}
+                        <Link to="/costs">
+                            <Card className="p-6 hover:scale-105 transition-all cursor-pointer border-2 border-transparent hover:border-green-500">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-cosmic-glow">
+                                        <DollarSign className="h-6 w-6 text-white" />
+                                    </div>
+                                    <ArrowRight className="h-5 w-5 text-cosmic-txt-2" />
+                                </div>
+                                <h4 className="text-lg font-semibold text-cosmic-txt-1 mb-2">Cost Explorer</h4>
+                                <p className="text-sm text-cosmic-txt-2 mb-3">
+                                    Analyze AWS spending, forecasts, and optimization opportunities
+                                </p>
+                                <div className="flex items-center space-x-2">
+                                    <div className="bg-green-500/20 px-3 py-1 rounded-lg text-xs text-green-400 font-semibold">
+                                        View Costs
+                                    </div>
+                                </div>
+                            </Card>
+                        </Link>
+                    </div>
                 </section>
 
                 {/* 🆕 NEW: GuardDuty Security Overview Section */}

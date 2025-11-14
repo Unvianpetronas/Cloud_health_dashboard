@@ -20,21 +20,21 @@ async def get_total_cost(
         client_provider: AWSClientProvider = Depends(get_aws_client_provider)
 ):
     """
-    Lấy tổng chi phí AWS trong khoảng thời gian.
+    Get total AWS cost for a time period.
     """
     try:
         cache_key = f"costexplorer:total:{start_date}:{end_date}:{granularity}"
         if not force_refresh:
             if cached := cache.get(cache_key):
                 logger.info("Returning cached total cost data")
-                return {**cached, "source": "cache_client", "cache_client": True}
+                return {**cached, "source": "cache", "cached": True}
 
         scanner = CostExplorerScanner(client_provider)
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(None, scanner.get_total_cost, start_date, end_date, granularity)
 
         cache.set(cache_key, result, ttl=300)
-        return {**result, "source": "aws", "cache_client": False}
+        return {**result, "source": "aws", "cached": False}
     except Exception as e:
         logger.exception("Error fetching total cost")
         raise HTTPException(status_code=500, detail=str(e))
@@ -49,21 +49,21 @@ async def get_cost_by_service(
         client_provider: AWSClientProvider = Depends(get_aws_client_provider)
 ):
     """
-    Chi phí AWS theo từng service.
+    AWS cost breakdown by service.
     """
     try:
         cache_key = f"costexplorer:by-service:{start_date}:{end_date}:{granularity}"
         if not force_refresh:
             if cached := cache.get(cache_key):
                 logger.info("Returning cached service cost data")
-                return {**cached, "source": "cache_client", "cache_client": True}
+                return {**cached, "source": "cache", "cached": True}
 
         scanner = CostExplorerScanner(client_provider)
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(None, scanner.get_cost_by_service, start_date, end_date, granularity)
 
         cache.set(cache_key, result, ttl=300)
-        return {**result, "source": "aws", "cache_client": False}
+        return {**result, "source": "aws", "cached": False}
     except Exception as e:
         logger.exception("Error fetching cost by service")
         raise HTTPException(status_code=500, detail=str(e))
@@ -78,21 +78,21 @@ async def get_cost_by_account(
         client_provider: AWSClientProvider = Depends(get_aws_client_provider)
 ):
     """
-    Chi phí AWS theo từng account.
+    AWS cost breakdown by account.
     """
     try:
         cache_key = f"costexplorer:by-account:{start_date}:{end_date}:{granularity}"
         if not force_refresh:
             if cached := cache.get(cache_key):
                 logger.info("Returning cached account cost data")
-                return {**cached, "source": "cache_client", "cache_client": True}
+                return {**cached, "source": "cache", "cached": True}
 
         scanner = CostExplorerScanner(client_provider)
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(None, scanner.get_cost_by_account, start_date, end_date, granularity)
 
         cache.set(cache_key, result, ttl=300)
-        return {**result, "source": "aws", "cache_client": False}
+        return {**result, "source": "aws", "cached": False}
     except Exception as e:
         logger.exception("Error fetching cost by account")
         raise HTTPException(status_code=500, detail=str(e))
@@ -106,21 +106,21 @@ async def get_cost_forecast(
         client_provider: AWSClientProvider = Depends(get_aws_client_provider)
 ):
     """
-    Dự báo chi phí trong tương lai.
+    Forecast future costs.
     """
     try:
         cache_key = f"costexplorer:forecast:{days_ahead}:{metric}"
         if not force_refresh:
             if cached := cache.get(cache_key):
                 logger.info("Returning cached cost forecast")
-                return {**cached, "source": "cache_client", "cache_client": True}
+                return {**cached, "source": "cache", "cached": True}
 
         scanner = CostExplorerScanner(client_provider)
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(None, scanner.get_cost_forecast, days_ahead, metric)
 
         cache.set(cache_key, result, ttl=300)
-        return {**result, "source": "aws", "cache_client": False}
+        return {**result, "source": "aws", "cached": False}
     except Exception as e:
         logger.exception("Error fetching cost forecast")
         raise HTTPException(status_code=500, detail=str(e))
@@ -133,21 +133,21 @@ async def get_rightsizing_recommendations(
         client_provider: AWSClientProvider = Depends(get_aws_client_provider)
 ):
     """
-    Gợi ý rightsizing (ví dụ: EC2) để tiết kiệm chi phí.
+    Get rightsizing recommendations (e.g., EC2) for cost savings.
     """
     try:
         cache_key = f"costexplorer:rightsizing:{service}"
         if not force_refresh:
             if cached := cache.get(cache_key):
                 logger.info("Returning cached rightsizing data")
-                return {**cached, "source": "cache_client", "cache_client": True}
+                return {**cached, "source": "cache", "cached": True}
 
         scanner = CostExplorerScanner(client_provider)
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(None, scanner.get_rightsizing_recommendations, service)
 
         cache.set(cache_key, result, ttl=600)
-        return {**result, "source": "aws", "cache_client": False}
+        return {**result, "source": "aws", "cached": False}
     except Exception as e:
         logger.exception("Error fetching rightsizing recommendations")
         raise HTTPException(status_code=500, detail=str(e))
@@ -160,7 +160,9 @@ async def get_cost_summary(
         force_refresh: bool = False,
         client_provider: AWSClientProvider = Depends(get_aws_client_provider)
 ):
-    """Tổng tất cả các cost: total cost, theo dịch vụ, theo tài khoản, và dự báo."""
+    """
+    Comprehensive cost summary: total cost, by service, by account, and forecast.
+    """
     try:
         end_date = datetime.now(UTC).date().isoformat()
         start_date = (datetime.now(UTC) - timedelta(days=start_days_ago)).date().isoformat()
@@ -169,7 +171,7 @@ async def get_cost_summary(
         if not force_refresh:
             if cache_data := cache.get(cache_key):
                 logger.info("Returning cached cost summary data")
-                return {**cache_data, "source": "cache_client", "cache_client": True}
+                return {**cache_data, "source": "cache", "cached": True}
 
         scanner = CostExplorerScanner(client_provider)
         loop = asyncio.get_running_loop()
@@ -192,7 +194,7 @@ async def get_cost_summary(
         }
 
         cache.set(cache_key, summary, ttl=300)
-        return {**summary, "source": "aws", "cache_client": False}
+        return {**summary, "source": "aws", "cached": False}
     except Exception as e:
         logger.exception("Error fetching cost summary")
         raise HTTPException(status_code=500, detail=f"CostExplorer summary error: {str(e)}")

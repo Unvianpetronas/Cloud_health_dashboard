@@ -14,6 +14,9 @@ import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Settings from './pages/Settings';
+import Architecture from './pages/Architecture';
+import S3Buckets from './pages/S3Buckets';
+import CostExplorer from './pages/CostExplorer';
 import NotFound from './pages/NotFound';
 
 // Import utilities
@@ -54,6 +57,30 @@ function App() {
                   element={
                     <ProtectedRoute>
                       <Settings />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/architecture"
+                  element={
+                    <ProtectedRoute>
+                      <Architecture />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/s3"
+                  element={
+                    <ProtectedRoute>
+                      <S3Buckets />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/costs"
+                  element={
+                    <ProtectedRoute>
+                      <CostExplorer />
                     </ProtectedRoute>
                   }
                 />
