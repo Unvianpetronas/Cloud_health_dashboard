@@ -23,6 +23,7 @@ class ClientModel(BaseModel):
         super().__init__()
         self.table = self.db.get_table(settings.CLIENTS_TABLE)
         self.use_secrets_manager = getattr(settings, 'USE_SECRETS_MANAGER', False)
+        self.secrets_manager = None  # Always initialize to avoid AttributeError
         if self.use_secrets_manager:
             self.secrets_manager = get_secrets_manager()
             logger.info("Secrets Manager enabled (hybrid mode)")
@@ -50,9 +51,10 @@ class ClientModel(BaseModel):
 
             encrypted_access = self.encryption.encrypt_credential(aws_access_key)
             encrypted_secret = self.encryption.encrypt_credential(aws_secret_key)
-            if self.use_secrets_manager:
+            if self.use_secrets_manager and self.secrets_manager:
                 try:
-                    success = self.secrets_manager.store_credentials(
+                    # Run in thread pool to avoid blocking event loop
+                    success = await self.secrets_manager.store_credentials_async(
                         client_id=aws_account_id,
                         access_key=aws_access_key,
                         secret_key=aws_secret_key,
@@ -125,9 +127,10 @@ class ClientModel(BaseModel):
                 return None
 
             credentials_from_sm = False
-            if self.use_secrets_manager or client.get('use_secrets_manager'):
+            if (self.use_secrets_manager or client.get('use_secrets_manager')) and self.secrets_manager:
                 try:
-                    creds = self.secrets_manager.get_credentials(aws_account_id)
+                    # Run in thread pool to avoid blocking event loop
+                    creds = await self.secrets_manager.get_credentials_async(aws_account_id)
                     if creds:
                         client['aws_access_key'] = creds['access_key']
                         client['aws_secret_key'] = creds['secret_key']
@@ -172,9 +175,9 @@ class ClientModel(BaseModel):
 
             credentials_from_sm = False
 
-            if self.use_secrets_manager or client.get('use_secrets_manager'):
+            if (self.use_secrets_manager or client.get('use_secrets_manager')) and self.secrets_manager:
                 try:
-                    creds = self.secrets_manager.get_credentials(aws_account_id)
+                    creds = await self.secrets_manager.get_credentials_async(aws_account_id)
                     if creds:
                         client['aws_access_key'] = creds['access_key']
                         client['aws_secret_key'] = creds['secret_key']
@@ -216,9 +219,9 @@ class ClientModel(BaseModel):
             aws_account_id = client['aws_account_id']
             credentials_from_sm = False
 
-            if self.use_secrets_manager or client.get('use_secrets_manager'):
+            if (self.use_secrets_manager or client.get('use_secrets_manager')) and self.secrets_manager:
                 try:
-                    creds = self.secrets_manager.get_credentials(aws_account_id)
+                    creds = await self.secrets_manager.get_credentials_async(aws_account_id)
                     if creds:
                         client['aws_access_key'] = creds['access_key']
                         client['aws_secret_key'] = creds['secret_key']
@@ -257,9 +260,9 @@ class ClientModel(BaseModel):
                     aws_account_id = item['aws_account_id']
                     credentials_from_sm = False
 
-                    if self.use_secrets_manager or item.get('use_secrets_manager'):
+                    if (self.use_secrets_manager or item.get('use_secrets_manager')) and self.secrets_manager:
                         try:
-                            creds = self.secrets_manager.get_credentials(aws_account_id)
+                            creds = await self.secrets_manager.get_credentials_async(aws_account_id)
                             if creds:
                                 item['aws_access_key'] = creds['access_key']
                                 item['aws_secret_key'] = creds['secret_key']
@@ -313,9 +316,10 @@ class ClientModel(BaseModel):
                     ':updated': datetime.now().isoformat()
                 }
             )
-            if self.use_secrets_manager:
+            if self.use_secrets_manager and self.secrets_manager:
                 try:
-                    success = self.secrets_manager.update_credentials(
+                    # Run in thread pool to avoid blocking event loop
+                    success = await self.secrets_manager.update_credentials_async(
                         client_id=aws_account_id,
                         access_key=aws_access_key,
                         secret_key=aws_secret_key,
@@ -440,9 +444,10 @@ class ClientModel(BaseModel):
         - Secrets Manager (if enabled)
         """
         try:
-            if self.use_secrets_manager:
+            if self.use_secrets_manager and self.secrets_manager:
                 try:
-                    self.secrets_manager.delete_credentials(
+                    # Run in thread pool to avoid blocking event loop
+                    await self.secrets_manager.delete_credentials_async(
                         aws_account_id,
                         force_delete=False  # 30-day recovery window
                     )
