@@ -26,7 +26,7 @@ class ClientModel(BaseModel):
         self.secrets_manager = None  # Always initialize to avoid AttributeError
         if self.use_secrets_manager:
             self.secrets_manager = get_secrets_manager()
-            logger.info("Secrets Manager enabled (hybrid mode)")
+            logger.debug("Secrets Manager enabled (hybrid mode)")  # Changed to DEBUG to reduce log spam
 
         self.encryption = ClientEncryption()
         self.cache = cache

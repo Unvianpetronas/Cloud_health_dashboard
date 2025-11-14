@@ -19,7 +19,7 @@ async def scan_all_ec2_instances(
         if not force_refresh:
             cache_data = cache.get(cache_key)
             if cache_data:
-                logger.info("Returning cached data")
+                logger.debug("Returning cached data")
                 return {
                     **cache_data,
                     'source' : 'cache_client',
@@ -51,7 +51,7 @@ async def get_running_instances(
         if not force_refresh:
             cache_data = cache.get(cache_key)
             if cache_data:
-                logger.info("Returning cached data")
+                logger.debug("Returning cached data")
                 return {
                     **cache_data,
                     'source' : 'cache_client',
@@ -81,7 +81,7 @@ async def get_cost_estimate(
         if not force_refresh:
             cache_data = cache.get(cache_key)
             if cache_data:
-                logger.info("Returning cached data")
+                logger.debug("Returning cached data")
                 return {
                     **cache_data,
                     'source' : 'cache_client',
@@ -110,7 +110,7 @@ async def get_instance_summary(
         if not force_refresh:
             cache_data = cache.get('ec2:summary')
             if cache_data:
-                logger.info("Returning cached data")
+                logger.debug("Returning cached data")
                 return {
                     **cache_data,
                     'source' : 'cache_client',
