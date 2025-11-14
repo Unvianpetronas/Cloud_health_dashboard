@@ -100,7 +100,7 @@ class ArchitectureAnalyzer :
 
         # Pillar 2: Security (0-100)
         security_score = self._evaluate_security_pillar(
-            security_findings, ec2_data, s3_data
+            security_findings, s3_data
         )
 
         # Pillar 3: Reliability (0-100)
@@ -176,7 +176,7 @@ class ArchitectureAnalyzer :
         return max(0, min(100, score))
 
 
-    async def _evaluate_security_pillar(self,
+    def _evaluate_security_pillar(self,
                                         security_findings: List[Dict],
                                         s3_data: List[Dict]
                                         ) :
@@ -208,7 +208,7 @@ class ArchitectureAnalyzer :
         return max(0, min(100, score))
 
 
-    async def _evaluate_reliability_pillar(self, ec2_data: List[Dict]):
+    def _evaluate_reliability_pillar(self, ec2_data: List[Dict]):
         """
         Evaluates the reliability of the client's AWS account.
 
