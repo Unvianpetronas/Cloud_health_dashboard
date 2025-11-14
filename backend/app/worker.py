@@ -509,7 +509,7 @@ class CloudHealthWorker:
                         region=region,
                         namespace='AWS/EC2',
                         metric_name='CPUUtilization',
-                        dimensions={'Name': 'InstanceId', 'Value': instance_id},
+                        dimension={'Name': 'InstanceId', 'Value': instance_id},
                         period=3600
                     )
                     cloudwatch_metrics['CPUUtilization'] = cpu_metrics
