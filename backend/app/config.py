@@ -49,7 +49,7 @@ class BaseConfig(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
 
     #Secrets Manager
-    USE_SECRETS_MANAGER: bool = True  # Enabled with async support - no event loop blocking
+    USE_SECRETS_MANAGER: bool = False  # Disabled - KMS key not created yet (use DynamoDB only)
 
     #Security Monitoring
     ENABLE_RATE_LIMITING: bool = True
