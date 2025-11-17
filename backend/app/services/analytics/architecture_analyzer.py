@@ -387,17 +387,29 @@ class ArchitectureAnalyzer :
         """Analyze performance metrics."""
 
         # Extract CPU utilization if available
-        cpu_metrics = cloudwatch_metrics.get('CPUUtilization', {})
+        cpu_metrics = cloudwatch_metrics.get('CPUUtilization', {}) # if same parameter take if diff fail
 
         avg_cpu = 0
         max_cpu = 0
+
+        # Ensure all this logic is indented inside the 'if'
+        # The 'if' will be true if the dictionary is not empty
         if cpu_metrics:
-            # cpu_metrics is a dict with keys: region, datapoints, label
-            datapoints = cpu_metrics.get('datapoints', [])
+
+            # cpu_metrics is the dictionary returned by get_metric_statistics,
+            # so we can get 'Datapoints' from it directly.
+            datapoints = cpu_metrics.get('Datapoints', [])
+
             if datapoints:
-                cpu_values = [dp.get('Average', 0) for dp in datapoints]
-                avg_cpu = statistics.mean(cpu_values) if cpu_values else 0
-                max_cpu = max(cpu_values) if cpu_values else 0
+                try:
+                    cpu_values = [dp.get('Average', 0) for dp in datapoints]
+                    avg_cpu = statistics.mean(cpu_values) if cpu_values else 0
+                    max_cpu = max(cpu_values) if cpu_values else 0
+                except Exception as e:
+                    # Good to log if statistics fail for some reason
+                    logger.warning(f"Could not calculate CPU statistics: {e}")
+                    avg_cpu = 0
+                    max_cpu = 0
 
         # Performance scoring
         performance_issues = []

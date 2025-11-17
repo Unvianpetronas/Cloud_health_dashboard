@@ -1,7 +1,8 @@
 import axios from 'axios';
 import logger from '../utils/logger';
 
-const API_BASE_URL = process.env.REACT_APP_BASE_URL || 'http://localhost:8000/api/v1';
+//const API_BASE_URL =   'http://localhost:8000/api/v1';  # To host local please command bellow code
+const API_BASE_URL = process.env.REACT_APP_BASE_URL || 'http://localhost:8000/api/v1' ;
 
 logger.info('API Base URL:', API_BASE_URL);
 

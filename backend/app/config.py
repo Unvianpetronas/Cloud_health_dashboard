@@ -5,7 +5,7 @@ import os
 from cryptography.fernet import Fernet
 
 
-environment = os.getenv("ENVIRONMENT", "production")
+environment = os.getenv("ENVIRONMENT", "production") # if wat to change to development environment change this to development
 env_file = f".env.{environment}"
 if os.path.exists(env_file):
     load_dotenv(env_file)
@@ -127,7 +127,7 @@ class ProductionConfig(BaseConfig):
 
 
 def get_settings() -> BaseConfig:
-    env = os.getenv("ENVIRONMENT", "development").lower()
+    env = os.getenv("ENVIRONMENT", "production").lower() # Change this to development to enable debug
 
     if env == "production":
         return ProductionConfig()
@@ -148,12 +148,12 @@ def validate_settings(settings: BaseConfig):
             Fernet(settings.ENCRYPTION_KEY.encode())
         except Exception:
             errors.append("ENCRYPTION_KEY is not a valid Fernet key")
-#
-#    if settings.ENVIRONMENT == "production":
- #       if settings.DEBUG:
-  #          errors.append("DEBUG must be False in production")
-   #     if not settings.CORS_ORIGINS:
-    #        errors.append("CORS_ORIGINS must be set in production")
+
+    if settings.ENVIRONMENT == "production":
+         if settings.DEBUG:
+             errors.append("DEBUG must be False in production")
+         if not settings.CORS_ORIGINS:
+             errors.append("CORS_ORIGINS must be set in production")
 
     if errors:
         raise ValueError(f"Configuration errors: {', '.join(errors)}")
