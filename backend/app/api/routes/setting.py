@@ -1,8 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from app.database.models import ClientModel
 from app.api.middleware.dependency import get_current_client_id
+from app.services.email.ses_client import SESEmailService
+from datetime import datetime, timedelta
 import logging
+import secrets
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -13,6 +16,10 @@ class NotificationPreferences(BaseModel):
     warning_alerts: bool = False
     cost_alerts: bool = True
     daily_summary: bool = False
+
+
+class UpdateEmailRequest(BaseModel):
+    email: EmailStr
 
 
 @router.get("/settings/notifications", tags=["Settings"])
@@ -132,4 +139,80 @@ async def get_user_profile(
         raise
     except Exception as e:
         logger.error(f"Error fetching user profile: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/settings/email", tags=["Settings"])
+async def update_email(
+        request: UpdateEmailRequest,
+        current_aws_account_id: str = Depends(get_current_client_id)
+):
+    """
+    Update user email address and send verification email
+    Marks email as unverified until user clicks verification link
+    """
+    try:
+        client_model = ClientModel()
+
+        # Get current client
+        client = await client_model.get_client_by_aws_account_id(current_aws_account_id)
+        if not client:
+            raise HTTPException(status_code=404, detail="Client not found")
+
+        # Check if email is already in use by another account
+        # (Optional: You can add this check if needed)
+
+        # Generate verification token
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.now() + timedelta(hours=24)
+
+        # Update email and reset verification status
+        client_model.table.update_item(
+            Key={
+                'pk': f"CLIENT#{current_aws_account_id}",
+                'sk': 'METADATA'
+            },
+            UpdateExpression='SET email = :email, email_verified = :verified, email_verification_token = :token, email_verification_expires = :expires, updated_at = :updated',
+            ExpressionAttributeValues={
+                ':email': request.email,
+                ':verified': False,
+                ':token': token,
+                ':expires': expires_at.isoformat(),
+                ':updated': datetime.now().isoformat()
+            }
+        )
+
+        logger.info(f"Email updated for {current_aws_account_id}: {request.email}")
+
+        # Send verification email
+        email_service = SESEmailService()
+        company_name = client.get('company_name', 'Your Company')
+
+        try:
+            result = await email_service.send_verification_email(
+                recipient_email=request.email,
+                verification_token=token,
+                client_name=company_name
+            )
+
+            if result:
+                logger.info(f"Verification email sent to {request.email}")
+            else:
+                logger.warning(f"Failed to send verification email to {request.email}")
+
+        except Exception as email_error:
+            logger.error(f"Error sending verification email: {email_error}")
+            # Don't fail the request if email sending fails
+
+        return {
+            "success": True,
+            "message": f"Email updated to {request.email}. Please check your inbox for verification link.",
+            "email": request.email,
+            "email_verified": False
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating email: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

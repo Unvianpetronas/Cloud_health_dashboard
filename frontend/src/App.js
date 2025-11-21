@@ -14,6 +14,7 @@ import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Settings from './pages/Settings';
+import VerifyEmail from './pages/VerifyEmail';
 
 // Import utilities
 import { createStarfield } from './utils/starfield';
@@ -32,29 +33,30 @@ function App() {
             <div className="App min-h-screen">
               <Routes>
                 <Route path="/login" element={<Login />} />
-                <Route 
-                  path="/" 
+                <Route path="/verify-email" element={<VerifyEmail />} />
+                <Route
+                  path="/"
                   element={
                     <ProtectedRoute>
                       <Home />
                     </ProtectedRoute>
-                  } 
+                  }
                 />
-                <Route 
-                  path="/dashboard" 
+                <Route
+                  path="/dashboard"
                   element={
                     <ProtectedRoute>
                       <Dashboard />
                     </ProtectedRoute>
-                  } 
+                  }
                 />
-                <Route 
-                  path="/settings" 
+                <Route
+                  path="/settings"
                   element={
                     <ProtectedRoute>
                       <Settings />
                     </ProtectedRoute>
-                  } 
+                  }
                 />
                 {/* Add more protected routes as needed */}
               </Routes>
