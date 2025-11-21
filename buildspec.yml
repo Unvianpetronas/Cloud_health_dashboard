@@ -1,167 +1,69 @@
 version: 0.2
 
-env:
-  variables:
-    EC2_INSTANCE_TAG: "CloudHealth-App"
-    S3_BUCKET: "cloudhealth-deployments"
-  parameter-store:
-    EC2_INSTANCE_ID: /cloudhealth/ec2/instance-id
+# AWS CodeBuild buildspec for Cloud Health Dashboard
+# Builds and pushes Docker images to ECR, then deploys to EC2
 
 phases:
-  install:
-    commands:
-      - echo "Installing build dependencies..."
-
   pre_build:
     commands:
-      - echo "=========================================="
-      - echo "Pre-build phase started on $(date)"
-      - echo "=========================================="
-      - echo "Installing Python dependencies..."
-      - test -f requirements.txt && pip install --quiet -r requirements.txt || echo "No root requirements.txt"
-      - test -f backend/requirements.txt && cd backend && pip install --quiet -r requirements.txt && cd .. || echo "No backend requirements.txt"
-      - echo "Installing Node.js dependencies..."
-      - cd frontend
-      - npm install --silent
-      - cd ..
-      - echo "Running tests..."
-      - test -d backend/tests && cd backend && python -m pytest tests/ --maxfail=1 --disable-warnings -q && cd .. || echo "Tests completed"
+      - echo "Logging in to Amazon ECR..."
+      - aws --version
+      - REPOSITORY_URI_FRONTEND=$ECR_REGISTRY/$ECR_FRONTEND_REPO
+      - REPOSITORY_URI_BACKEND=$ECR_REGISTRY/$ECR_BACKEND_REPO
+      - REPOSITORY_URI_NGINX=$ECR_REGISTRY/$ECR_NGINX_REPO
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG=${COMMIT_HASH:=latest}
+      - echo "Building image with tag $IMAGE_TAG"
 
   build:
     commands:
-      - echo "=========================================="
-      - echo "Build phase started on $(date)"
-      - echo "=========================================="
-      - echo "Building React frontend..."
+      - echo "Building Docker images..."
+
+      # Build Frontend
+      - echo "Building frontend..."
       - cd frontend
-      - npm run build
+      - docker build -t $REPOSITORY_URI_FRONTEND:latest .
+      - docker tag $REPOSITORY_URI_FRONTEND:latest $REPOSITORY_URI_FRONTEND:$IMAGE_TAG
       - cd ..
-      - echo "Creating deployment package..."
-      - mkdir -p /tmp/deployment
-      - cp -r backend /tmp/deployment/
-      - cp -r frontend/build /tmp/deployment/frontend-build
-      - cp -r deployment /tmp/deployment/
-      - test -f .env.example && cp .env.example /tmp/deployment/ || true
-      - test -f requirements.txt && cp requirements.txt /tmp/deployment/ || true
-      - echo "Creating tarball..."
-      - cd /tmp/deployment
-      - tar -czf /tmp/cloud-health-app.tar.gz .
-      - cd $CODEBUILD_SRC_DIR
-      - echo "Package created - $(du -h /tmp/cloud-health-app.tar.gz)"
+
+      # Build Backend
+      - echo "Building backend..."
+      - cd backend
+      - docker build -t $REPOSITORY_URI_BACKEND:latest .
+      - docker tag $REPOSITORY_URI_BACKEND:latest $REPOSITORY_URI_BACKEND:$IMAGE_TAG
+      - cd ..
+
+      # Build Nginx
+      - echo "Building nginx..."
+      - docker build -f nginx/Dockerfile -t $REPOSITORY_URI_NGINX:latest ./nginx
+      - docker tag $REPOSITORY_URI_NGINX:latest $REPOSITORY_URI_NGINX:$IMAGE_TAG
 
   post_build:
     commands:
-      - echo "=========================================="
-      - echo "Deployment phase started on $(date)"
-      - echo "=========================================="
-      - echo "Getting EC2 instance ID..."
-      - >
-        if [ -n "$EC2_INSTANCE_ID" ]; then
-        echo "Using instance ID from Parameter Store: $EC2_INSTANCE_ID";
-        else
-        echo "Finding instance by tag: $EC2_INSTANCE_TAG";
-        EC2_INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=$EC2_INSTANCE_TAG" "Name=instance-state-name,Values=running" --query "Reservations[0].Instances[0].InstanceId" --output text);
-        fi
-      - echo "Target EC2 Instance - $EC2_INSTANCE_ID"
-      - echo "Uploading deployment package to S3..."
-      - S3_KEY="builds/cloud-health-app-${CODEBUILD_BUILD_NUMBER}.tar.gz"
-      - aws s3 cp /tmp/cloud-health-app.tar.gz s3://${S3_BUCKET}/${S3_KEY}
-      - echo "Package uploaded to s3://${S3_BUCKET}/${S3_KEY}"
-      - echo "Creating deployment script..."
-      - |
-        cat > /tmp/deploy-script.sh << 'DEPLOY_EOF'
-        #!/bin/bash
-        set -e
-        APP_DIR="/home/ec2-user/cloud-health-dashboard"
-        DEPLOY_PACKAGE="/tmp/cloud-health-app.tar.gz"
-        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-        echo "======================================"
-        echo "Deployment started: $TIMESTAMP"
-        echo "======================================"
-        echo "Downloading deployment package from S3..."
-        aws s3 cp s3://S3_BUCKET_PLACEHOLDER/S3_KEY_PLACEHOLDER ${DEPLOY_PACKAGE}
-        echo "Package downloaded: $(du -h ${DEPLOY_PACKAGE} | cut -f1)"
-        if [ -d "$APP_DIR" ]; then
-          echo "Creating backup..."
-          sudo tar -czf "/home/ec2-user/backup-$TIMESTAMP.tar.gz" -C "$APP_DIR" . 2>/dev/null || true
-        fi
-        sudo mkdir -p "$APP_DIR"
-        sudo chown ec2-user:ec2-user "$APP_DIR"
-        echo "Extracting deployment package..."
-        tar -xzf "$DEPLOY_PACKAGE" -C "$APP_DIR"
-        echo "Running deployment script..."
-        cd "$APP_DIR"
-        chmod +x deployment/scripts/*.sh 2>/dev/null || true
-        if [ -f deployment/scripts/deploy.sh ]; then
-          ./deployment/scripts/deploy.sh
-        else
-          echo "No deploy.sh script found"
-        fi
-        rm -f "$DEPLOY_PACKAGE"
-        echo "======================================"
-        echo "Deployment completed: $(date)"
-        echo "======================================"
-        DEPLOY_EOF
-      - sed -i "s|S3_BUCKET_PLACEHOLDER|${S3_BUCKET}|g" /tmp/deploy-script.sh
-      - sed -i "s|S3_KEY_PLACEHOLDER|${S3_KEY}|g" /tmp/deploy-script.sh
-      - echo "Creating SSM command JSON..."
-      - |
-        python3 << 'PYTHON_EOF'
-        import json
-        with open('/tmp/deploy-script.sh', 'r') as f:
-            script_content = f.read()
-        command_json = {
-            "InstanceIds": ["INSTANCE_ID_PLACEHOLDER"],
-            "DocumentName": "AWS-RunShellScript",
-            "Comment": "Deploy CloudHealth Dashboard - Build BUILD_NUMBER_PLACEHOLDER",
-            "Parameters": {
-                "commands": [script_content]
-            }
-        }
-        with open('/tmp/ssm-command.json', 'w') as f:
-            json.dump(command_json, f)
-        PYTHON_EOF
-      - sed -i "s|INSTANCE_ID_PLACEHOLDER|${EC2_INSTANCE_ID}|g" /tmp/ssm-command.json
-      - sed -i "s|BUILD_NUMBER_PLACEHOLDER|${CODEBUILD_BUILD_NUMBER}|g" /tmp/ssm-command.json
-      - echo "Sending deployment command to EC2..."
-      - COMMAND_ID=$(aws ssm send-command --cli-input-json file:///tmp/ssm-command.json --output text --query "Command.CommandId")
-      - echo "SSM Command ID - $COMMAND_ID"
-      - echo "Waiting for deployment to complete..."
-      - >
-        MAX_ATTEMPTS=60;
-        ATTEMPT=0;
-        while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
-        STATUS=$(aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$EC2_INSTANCE_ID" --query "Status" --output text 2>/dev/null || echo "Pending");
-        echo "Attempt $((ATTEMPT+1))/$MAX_ATTEMPTS - Status: $STATUS";
-        if [ "$STATUS" = "Success" ]; then
-        echo "Deployment successful!";
-        aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$EC2_INSTANCE_ID" --query "StandardOutputContent" --output text;
-        break;
-        elif [ "$STATUS" = "Failed" ]; then
-        echo "Deployment failed!";
-        aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$EC2_INSTANCE_ID" --query "StandardErrorContent" --output text;
-        exit 1;
-        elif [ "$STATUS" = "Cancelled" ] || [ "$STATUS" = "TimedOut" ]; then
-        echo "Deployment $STATUS!";
-        exit 1;
-        fi;
-        sleep 5;
-        ATTEMPT=$((ATTEMPT+1));
-        done;
-        if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
-        echo "Deployment timed out after $((MAX_ATTEMPTS*5)) seconds";
-        exit 1;
-        fi
-      - echo "=========================================="
-      - echo "Build completed on $(date)"
-      - echo "=========================================="
+      - echo "Pushing Docker images to ECR..."
+
+      # Push Frontend
+      - docker push $REPOSITORY_URI_FRONTEND:latest
+      - docker push $REPOSITORY_URI_FRONTEND:$IMAGE_TAG
+
+      # Push Backend
+      - docker push $REPOSITORY_URI_BACKEND:latest
+      - docker push $REPOSITORY_URI_BACKEND:$IMAGE_TAG
+
+      # Push Nginx
+      - docker push $REPOSITORY_URI_NGINX:latest
+      - docker push $REPOSITORY_URI_NGINX:$IMAGE_TAG
+
+      - echo "Build completed successfully"
 
 artifacts:
   files:
-    - '**/*'
-  name: CloudHealthApp-$CODEBUILD_BUILD_NUMBER
+    - docker-compose.yml
+    - nginx/nginx.conf
+    - scripts/deploy-ec2.sh
 
 cache:
   paths:
-    - 'frontend/node_modules/**/*'
-    - 'backend/.venv/**/*'
+    - '/root/.npm/**/*'
+    - '/root/.cache/**/*'
