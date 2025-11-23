@@ -110,7 +110,7 @@ const Home = () => {
       <section className="hero">
         <div className="container">
           <div className="badge mb-6 animate-fade-in">
-            ✨ New Features Available
+            <span className="text-cosmic-txt-2">New Features Available</span>
           </div>
           <h1 className="hero-title">
             AWS Cloud Health
