@@ -230,8 +230,8 @@ class CloudHealthWorker:
             if not client or not client.get('email_verified'):
                 return
 
-            prefs = client.get('notification_preferences', {})
-            if not prefs.get('critical_alerts', True):
+            prefs = client.get('notification_preferences', True)
+            if not prefs:
                 return
 
             critical_findings = [
