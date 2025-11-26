@@ -41,7 +41,7 @@ const Header = ({
                   {title}
                 </h1>
                 <div className="badge mt-1 animate-fade-in">
-                  ✨ Real-time Monitoring
+                  Real-time Monitoring
                 </div>
               </div>
             </div>
