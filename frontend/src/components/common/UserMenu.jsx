@@ -61,7 +61,7 @@ const UserMenu = () => {
             {/* Dropdown Menu */}
             {isOpen && (
                 <div
-                    className="absolute right-0 mt-2 w-64 card p-2 shadow-cosmic-glow-lg animate-scale-in z-50"
+                    className="user-menu-dropdown absolute right-0 top-full mt-4 w-64 card p-2 shadow-cosmic-glow-lg animate-scale-in z-50"
                     style={{ animationDuration: '0.2s' }}
                 >
                     {/* User Info */}

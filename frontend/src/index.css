@@ -274,6 +274,18 @@ code {
   opacity: 1;
 }
 
+/* Ensure dropdowns using card styling do not affect layout */
+.user-menu-dropdown {
+  position: absolute;
+  overflow: visible;
+  z-index: 60;
+}
+
+.navbar--header {
+  z-index: 60;
+  position: relative;
+}
+
 /* Cosmic Animations */
 .animate-float {
   animation: float 6s ease-in-out infinite;
