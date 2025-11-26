@@ -10,8 +10,7 @@ const Navigation = () => {
     { path: '/dashboard', label: 'Dashboard', icon: BarChart3 },
     { path: '/architecture', label: 'Architecture', icon: Shield },
     { path: '/s3', label: 'S3 Buckets', icon: Database },
-    { path: '/costs', label: 'Cost Explorer', icon: DollarSign },
-    { path: '/settings', label: 'Settings', icon: Settings }
+    { path: '/costs', label: 'Cost Explorer', icon: DollarSign }
   ];
 
   const isActive = (path) => {
@@ -21,7 +20,7 @@ const Navigation = () => {
   return (
     <nav className="mx-6 mb-6">
       <div className="navbar">
-        <div className="flex space-x-2">
+      <div className="flex space-x-2">
           {navItems.map(({ path, label, icon: Icon }) => (
             <Link
               key={path}
