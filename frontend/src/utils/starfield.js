@@ -18,7 +18,8 @@ export const createStarfield = (containerId = 'starfield') => {
   
   // Generate different types of stars
   const starCount = 150;
-  const shootingStarCount = 3;
+  // Giảm số lượng sao băng để hiệu ứng nhẹ nhàng hơn
+  const shootingStarCount = 1;
   
   // Regular stars
   for (let i = 0; i < starCount; i++) {
@@ -53,18 +54,19 @@ export const createStarfield = (containerId = 'starfield') => {
     const startX = Math.random() * 100;
     const startY = Math.random() * 50;
     const length = Math.random() * 100 + 50;
-    const angle = Math.random() * 45 + 15;
-    const duration = Math.random() * 2 + 1;
-    const delay = Math.random() * 10;
+    // Hướng sao băng: từ đông bắc xuống tây nam (khoảng 135deg)
+    const angle = 135;
+    const duration = Math.random() * 2 + 1.5;
+    // Tăng khoảng delay để sao băng xuất hiện thưa hơn
+    const delay = Math.random() * 20;
     
     shootingStar.style.cssText = `
       position: absolute;
       width: ${length}px;
       height: 2px;
-      background: linear-gradient(90deg, rgba(255, 255, 255, 0.8) 0%, rgba(59, 130, 246, 0.6) 50%, transparent 100%);
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(59, 130, 246, 0.7) 40%, transparent 100%);
       left: ${startX}%;
       top: ${startY}%;
-      transform: rotate(${angle}deg);
       animation: shootingStar ${duration}s linear infinite;
       animation-delay: ${delay}s;
       opacity: 0;
@@ -96,7 +98,7 @@ export const createStarfield = (containerId = 'starfield') => {
       @keyframes shootingStar {
         0% { 
           opacity: 0; 
-          transform: translateX(-100px) rotate(${Math.random() * 45 + 15}deg); 
+          transform: translate3d(40vw, -40vh, 0) rotate(135deg); 
         }
         10% { 
           opacity: 1; 
@@ -106,7 +108,7 @@ export const createStarfield = (containerId = 'starfield') => {
         }
         100% { 
           opacity: 0; 
-          transform: translateX(100vw) rotate(${Math.random() * 45 + 15}deg); 
+          transform: translate3d(-60vw, 60vh, 0) rotate(135deg); 
         }
       }
       
