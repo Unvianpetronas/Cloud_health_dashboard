@@ -18,6 +18,7 @@ import Architecture from './pages/Architecture';
 import S3Buckets from './pages/S3Buckets';
 import CostExplorer from './pages/CostExplorer';
 import NotFound from './pages/NotFound';
+import VerifyEmail from "./pages/VerifyEmail";
 
 // Import utilities
 import { createStarfield } from './utils/starfield';
@@ -36,13 +37,14 @@ function App() {
             <div className="App min-h-screen">
               <Routes>
                 <Route path="/login" element={<Login />} />
-                <Route 
-                  path="/" 
-                  element={
-                    <ProtectedRoute>
-                      <Home />
-                    </ProtectedRoute>
-                  } 
+                  <Route path="/verify-email" element={<VerifyEmail />} />
+                  <Route
+                      path="/"
+                      element={
+                          <ProtectedRoute>
+                              <Home />
+                          </ProtectedRoute>
+                      }
                 />
                 <Route 
                   path="/dashboard" 

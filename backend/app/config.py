@@ -42,7 +42,6 @@ class BaseConfig(BaseSettings):
 
     # SES
     SES_SENDER_EMAIL: str = "noreply@cloudhealthdashboard.xyz"
-    FRONTEND_URL: str = "https://cloudhealthdashboard.xyz"
     EMAIL_VERIFICATION_EXPIRE_HOURS: int = 24
 
     # Cache
@@ -88,6 +87,7 @@ class DevelopmentConfig(BaseConfig):
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5173"
     ]
+    FRONTEND_URL: str = "http://localhost:3000"
 
     # Auto-generate secure keys for development
     @property
@@ -116,6 +116,8 @@ class ProductionConfig(BaseConfig):
         "http://cloudhealthdashboard.xyz",
         "http://www.cloudhealthdashboard.xyz"
     ] # Must be set via environment
+
+    FRONTEND_URL: str = "https://cloudhealthdashboard.xyz"
 
     # Production requires real secrets from environm0ent
     JWT_SECRET_KEY: str

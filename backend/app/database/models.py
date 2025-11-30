@@ -3,6 +3,9 @@ from typing import Dict, Optional, List, Union
 from boto3.dynamodb.conditions import Key, Attr
 import uuid
 import logging
+
+from twisted.words.protocols.jabber.jstrports import client
+
 from app.database.dynamodb import DynamoDBConnection
 from app.config import settings
 from decimal import Decimal
@@ -551,14 +554,20 @@ class ClientModel(BaseModel):
                                 aws_account_id: str,
                                 email: str) -> bool:
         try:
-            self.table.update_item(
-                Key={'pk': f"CLIENT#{aws_account_id}", 'sk': 'METADATA'},
-                UpdateExpression='SET email = :email, updated_at = :updated',
-                ExpressionAttributeValues={
-                    ':email': email,
-                    ':updated': datetime.now().isoformat()
-                }
-            )
+            client = await self.get_client_by_email(email)
+            if not client :
+                self.table.update_item(
+                    Key={'pk': f"CLIENT#{aws_account_id}", 'sk': 'METADATA'},
+                    UpdateExpression='SET email = :email, updated_at = :updated, email_verified = :verified',
+                    ExpressionAttributeValues={
+                        ':email': email,
+                        ':updated': datetime.now().isoformat(),
+                        ':verified': False
+                    }
+                )
+            else:
+                logger.error(f"Email already exists: {email}")
+                return False
 
             return True
 
@@ -627,9 +636,23 @@ class ClientModel(BaseModel):
             logger.error(f"Error setting verification token: {e}")
             return False
 
-    async def verify_email(self, aws_account_id: str) -> bool:
-        """Mark email as verified"""
+    async def verify_email(self, token: str) -> Optional[str]:
+
+        """
+        Verify email using token and mark as verified
+        Returns aws_account_id on success, None on failure
+        """
+
         try:
+
+            # Get client by verification token
+            client = await self.get_client_by_verification_token(token)
+            if not client:
+                logger.warning(f"Invalid or expired verification token")
+                return None
+
+            aws_account_id = client['aws_account_id']
+            # Mark as verified
             self.table.update_item(
                 Key={'pk': f"CLIENT#{aws_account_id}", 'sk': 'METADATA'},
                 UpdateExpression='SET email_verified = :verified, email_verification_token = :empty, updated_at = :updated',
@@ -642,14 +665,15 @@ class ClientModel(BaseModel):
 
             # Invalidate cache_client
             self.cache.delete(f"client:{aws_account_id}")
-
             logger.info(f"Email verified for {aws_account_id}")
-            return True
+
+            return aws_account_id
 
         except Exception as e:
-            logger.error(f"Error verifying email: {e}")
-            return False
 
+            logger.error(f"Error verifying email: {e}")
+
+            return None
 
 
 

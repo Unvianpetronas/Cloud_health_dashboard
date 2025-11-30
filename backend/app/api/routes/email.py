@@ -309,7 +309,8 @@ async def update_email(
         )
 
         if not success:
-            raise HTTPException(status_code=500, detail="Failed to update email")
+            logger.error(f"Failed to update email for {current_aws_account_id}")
+            raise HTTPException(status_code=500, detail="Email already exist!")
 
         logger.info(f"Email updated for {current_aws_account_id}")
 
