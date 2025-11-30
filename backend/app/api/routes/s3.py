@@ -17,14 +17,12 @@ async def list_buckets(
         client_provider: AWSClientProvider = Depends(get_aws_client_provider)
 ):
     """
-    List all S3 buckets in the account and their regions.
+    List all S3 buckets names and regions.
     """
     try:
         cache_key = "s3:buckets:list"
-        if not force_refresh:
-            if cached := cache.get(cache_key):
-                logger.info("Returning cached S3 bucket list")
-                return {**cached, "source": "cache", "cache": True}
+        if not force_refresh and (cached := cache.get(cache_key)):
+            return {**cached, "source": "cache"}
 
         scanner = S3Scanner(client_provider)
         loop = asyncio.get_running_loop()
@@ -32,30 +30,26 @@ async def list_buckets(
 
         result = {"total_buckets": len(buckets), "buckets": buckets}
         cache.set(cache_key, result, ttl=300)
-
-        return {**result, "source": "aws", "cache": False}
+        return {**result, "source": "aws"}
     except Exception as e:
         logger.exception("Error listing S3 buckets")
-        logger.error(f"Internal error details: {e}", exc_info=True)  # Log details
-        raise HTTPException(status_code=500, detail="An error occurred processing your request")
+        raise HTTPException(status_code=500, detail="Error listing buckets")
 
 
 @router.get("/s3/bucket/metrics", tags=["S3"])
 async def get_bucket_metrics(
-        bucket_name: str = Query(..., description="S3 bucket name to get metrics for"),
-        region: str = Query(..., description="Region of the bucket"),
+        bucket_name: str = Query(..., description="Bucket name"),
+        region: str = Query(..., description="Bucket region"),
         force_refresh: bool = False,
         client_provider: AWSClientProvider = Depends(get_aws_client_provider)
 ):
     """
-    Get metric information (storage size & object count) for a specific bucket.
+    Get metrics for ONE specific bucket.
     """
     try:
         cache_key = f"s3:metrics:{bucket_name}:{region}"
-        if not force_refresh:
-            if cached := cache.get(cache_key):
-                logger.info(f"Returning cached metrics for bucket {bucket_name}")
-                return {**cached, "source": "cache", "cache": True}
+        if not force_refresh and (cached := cache.get(cache_key)):
+            return {**cached, "source": "cache"}
 
         scanner = S3Scanner(client_provider)
         loop = asyncio.get_running_loop()
@@ -63,11 +57,10 @@ async def get_bucket_metrics(
 
         result = {"bucket": bucket_name, "region": region, "metrics": metrics}
         cache.set(cache_key, result, ttl=300)
-
-        return {**result, "source": "aws", "cache": False}
+        return {**result, "source": "aws"}
     except Exception as e:
-        logger.exception(f"Error fetching S3 metrics for bucket {bucket_name}")
-        raise HTTPException(status_code=500, detail=f"S3 bucket metrics error: {str(e)}")
+        logger.exception(f"Error getting metrics for {bucket_name}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/s3/summary", tags=["S3"])
@@ -76,43 +69,73 @@ async def get_s3_summary(
         client_provider: AWSClientProvider = Depends(get_aws_client_provider)
 ):
     """
-    Scan all S3 buckets and get metrics in parallel for each bucket.
-    Returns comprehensive S3 usage overview.
+    MASTER ENDPOINT:
+    1. Scans ALL buckets.
+    2. Calculates Total Storage (GB).
+    3. Returns Top 10 Buckets AND Full List.
     """
     try:
-        cache_key = "s3:summary:all"
-        if not force_refresh:
-            if cached := cache.get(cache_key):
-                logger.info("Returning cached S3 summary data")
-                return {**cached, "source": "cache", "cache": True}
+        cache_key = "s3:summary:dashboard"
+        if not force_refresh and (cached := cache.get(cache_key)):
+            return {**cached, "source": "cache"}
 
         scanner = S3Scanner(client_provider)
         loop = asyncio.get_running_loop()
 
-        # Step 1: Get list of buckets
+        # 1. Get List of Buckets
         buckets = await loop.run_in_executor(None, scanner.list_buckets)
         if not buckets:
-            return {"total_buckets": 0, "buckets": [], "source": "aws", "cache": False}
-
-        # Step 2: Scan metrics in parallel
-        def fetch_metrics(b):
             return {
-                "bucket": b["bucket"],
-                "region": b["region"],
-                "metrics": scanner.get_bucket_storage_metrics(b["bucket"], b["region"])
+                "total_storage_gb": 0,
+                "top_10_buckets": [],
+                "all_buckets_details": [],
+                "source": "aws"
             }
 
+        # 2. Helper function to scan a single bucket
+        def fetch_metrics(b):
+            # This calls the S3Scanner to get real-time size
+            m = scanner.get_bucket_storage_metrics(b["bucket"], b["region"])
+            return {
+                "name": b["bucket"],
+                "region": b["region"],
+                "size_gb": m.get("size_gb", 0),
+                "size_mb": m.get("size_mb", 0),
+                "object_count": m.get("ObjectCount", 0)
+            }
+
+        # 3. Parallel Scanning (Fast!)
         results = []
-        with ThreadPoolExecutor(max_workers=min(10, len(buckets))) as executor:
+        with ThreadPoolExecutor(max_workers=10) as executor:
             futures = [loop.run_in_executor(executor, fetch_metrics, b) for b in buckets]
             for f in asyncio.as_completed(futures):
                 results.append(await f)
 
-        summary = {"total_buckets": len(results), "buckets": results}
+        # 4. AGGREGATION LOGIC
+        # Sum up all GB
+        total_storage_gb = sum(r['size_gb'] for r in results)
 
-        cache.set(cache_key, summary, ttl=600)
-        return {**summary, "source": "aws", "cache": False}
+        # Sort by size_gb (Largest first)
+        sorted_buckets = sorted(results, key=lambda x: x['size_gb'], reverse=True)
+
+        # Take Top 10
+        top_10 = sorted_buckets[:10]
+
+        # Calculate Free Tier Usage (5GB Limit)
+        usage_percent = (total_storage_gb / 5.0) * 100
+
+        data = {
+            "total_buckets": len(buckets),
+            "total_storage_gb": round(total_storage_gb, 4),
+            "free_tier_usage_percent": round(usage_percent, 2),
+            "top_10_buckets": top_10,
+            # FIXED: Added the full list of buckets here
+            "all_buckets_details": sorted_buckets
+        }
+
+        cache.set(cache_key, data, ttl=600)
+        return {**data, "source": "aws"}
 
     except Exception as e:
-        logger.exception("Error scanning all S3 buckets")
-        raise HTTPException(status_code=500, detail=f"S3 summary error: {str(e)}")
+        logger.exception("Error generating S3 summary")
+        raise HTTPException(status_code=500, detail=str(e))
