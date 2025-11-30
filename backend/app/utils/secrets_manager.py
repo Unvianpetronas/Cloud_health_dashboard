@@ -4,6 +4,8 @@ from botocore.exceptions import ClientError
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import logging
+import asyncio
+from functools import partial
 
 logger = logging.getLogger(__name__)
 UTC = ZoneInfo("UTC")
@@ -31,6 +33,17 @@ class SecretsManager:
 
         # KMS key alias for encryption (you'll create this in AWS)
         self.kms_key_id = 'alias/cloud-health-kms'
+
+    async def store_credentials_async(self, client_id: str, access_key: str,
+                                      secret_key: str, aws_region: str = 'us-east-1') -> bool:
+        """
+        Async wrapper for store_credentials - runs in thread pool to avoid blocking event loop.
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None,
+            partial(self.store_credentials, client_id, access_key, secret_key, aws_region)
+        )
 
     def store_credentials(self, client_id: str, access_key: str,
                           secret_key: str, aws_region: str = 'us-east-1') -> bool:
@@ -96,6 +109,16 @@ class SecretsManager:
             logger.error(f"Unexpected error storing credentials: {e}")
             return False
 
+    async def get_credentials_async(self, client_id: str) -> dict:
+        """
+        Async wrapper for get_credentials - runs in thread pool to avoid blocking event loop.
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None,
+            partial(self.get_credentials, client_id)
+        )
+
     def get_credentials(self, client_id: str) -> dict:
         """
         Retrieve AWS credentials from Secrets Manager
@@ -151,6 +174,17 @@ class SecretsManager:
             logger.error(f"Unexpected error retrieving credentials: {e}")
             return None
 
+    async def update_credentials_async(self, client_id: str, access_key: str,
+                                       secret_key: str, aws_region: str = 'us-east-1') -> bool:
+        """
+        Async wrapper for update_credentials - runs in thread pool to avoid blocking event loop.
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None,
+            partial(self.update_credentials, client_id, access_key, secret_key, aws_region)
+        )
+
     def update_credentials(self, client_id: str, access_key: str,
                            secret_key: str, aws_region: str = 'us-east-1') -> bool:
         """
@@ -191,6 +225,17 @@ class SecretsManager:
         except Exception as e:
             logger.error(f"Unexpected error updating credentials: {e}")
             return False
+
+    async def delete_credentials_async(self, client_id: str,
+                                       force_delete: bool = False) -> bool:
+        """
+        Async wrapper for delete_credentials - runs in thread pool to avoid blocking event loop.
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None,
+            partial(self.delete_credentials, client_id, force_delete)
+        )
 
     def delete_credentials(self, client_id: str,
                            force_delete: bool = False) -> bool:

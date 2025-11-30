@@ -3,6 +3,9 @@ from typing import Dict, Optional, List, Union
 from boto3.dynamodb.conditions import Key, Attr
 import uuid
 import logging
+
+from twisted.words.protocols.jabber.jstrports import client
+
 from app.database.dynamodb import DynamoDBConnection
 from app.config import settings
 from decimal import Decimal
@@ -23,6 +26,7 @@ class ClientModel(BaseModel):
         super().__init__()
         self.table = self.db.get_table(settings.CLIENTS_TABLE)
         self.use_secrets_manager = getattr(settings, 'USE_SECRETS_MANAGER', False)
+        self.secrets_manager = None  # Always initialize to avoid AttributeError
         if self.use_secrets_manager:
             self.secrets_manager = get_secrets_manager()
             logger.info("Secrets Manager enabled (hybrid mode)")
@@ -50,9 +54,10 @@ class ClientModel(BaseModel):
 
             encrypted_access = self.encryption.encrypt_credential(aws_access_key)
             encrypted_secret = self.encryption.encrypt_credential(aws_secret_key)
-            if self.use_secrets_manager:
+            if self.use_secrets_manager and self.secrets_manager:
                 try:
-                    success = self.secrets_manager.store_credentials(
+                    # Run in thread pool to avoid blocking event loop
+                    success = await self.secrets_manager.store_credentials_async(
                         client_id=aws_account_id,
                         access_key=aws_access_key,
                         secret_key=aws_secret_key,
@@ -82,10 +87,7 @@ class ClientModel(BaseModel):
                 'email_verified': False,
                 'email_verification_token': '',
                 'email_verification_expires': '',
-                'notification_preferences': {
-                    'critical_alerts': True,
-                    'daily_summary': False
-                },
+                'notification_preferences': False,
                 'use_secrets_manager': self.use_secrets_manager
             }
 
@@ -125,9 +127,10 @@ class ClientModel(BaseModel):
                 return None
 
             credentials_from_sm = False
-            if self.use_secrets_manager or client.get('use_secrets_manager'):
+            if (self.use_secrets_manager or client.get('use_secrets_manager')) and self.secrets_manager:
                 try:
-                    creds = self.secrets_manager.get_credentials(aws_account_id)
+                    # Run in thread pool to avoid blocking event loop
+                    creds = await self.secrets_manager.get_credentials_async(aws_account_id)
                     if creds:
                         client['aws_access_key'] = creds['access_key']
                         client['aws_secret_key'] = creds['secret_key']
@@ -172,9 +175,9 @@ class ClientModel(BaseModel):
 
             credentials_from_sm = False
 
-            if self.use_secrets_manager or client.get('use_secrets_manager'):
+            if (self.use_secrets_manager or client.get('use_secrets_manager')) and self.secrets_manager:
                 try:
-                    creds = self.secrets_manager.get_credentials(aws_account_id)
+                    creds = await self.secrets_manager.get_credentials_async(aws_account_id)
                     if creds:
                         client['aws_access_key'] = creds['access_key']
                         client['aws_secret_key'] = creds['secret_key']
@@ -216,9 +219,9 @@ class ClientModel(BaseModel):
             aws_account_id = client['aws_account_id']
             credentials_from_sm = False
 
-            if self.use_secrets_manager or client.get('use_secrets_manager'):
+            if (self.use_secrets_manager or client.get('use_secrets_manager')) and self.secrets_manager:
                 try:
-                    creds = self.secrets_manager.get_credentials(aws_account_id)
+                    creds = await self.secrets_manager.get_credentials_async(aws_account_id)
                     if creds:
                         client['aws_access_key'] = creds['access_key']
                         client['aws_secret_key'] = creds['secret_key']
@@ -257,9 +260,9 @@ class ClientModel(BaseModel):
                     aws_account_id = item['aws_account_id']
                     credentials_from_sm = False
 
-                    if self.use_secrets_manager or item.get('use_secrets_manager'):
+                    if (self.use_secrets_manager or item.get('use_secrets_manager')) and self.secrets_manager:
                         try:
-                            creds = self.secrets_manager.get_credentials(aws_account_id)
+                            creds = await self.secrets_manager.get_credentials_async(aws_account_id)
                             if creds:
                                 item['aws_access_key'] = creds['access_key']
                                 item['aws_secret_key'] = creds['secret_key']
@@ -289,200 +292,26 @@ class ClientModel(BaseModel):
             logger.error(f"Error getting active clients: {e}")
             return []
 
-    async def update_credentials(self,
-                                 aws_account_id: str,
-                                 aws_access_key: str,
-                                 aws_secret_key: str,
-                                 aws_region: str = "us-east-1") -> bool:
-        """
-        Update credentials in BOTH places:
-        - DynamoDB (always)
-        - Secrets Manager (if enabled)
-        """
+    async def get_clients_with_notifications_enabled(self):
         try:
-            encrypted_access = self.encryption.encrypt_credential(aws_access_key)
-            encrypted_secret = self.encryption.encrypt_credential(aws_secret_key)
-
-            self.table.update_item(
-                Key={'pk': f"CLIENT#{aws_account_id}", 'sk': 'METADATA'},
-                UpdateExpression='SET aws_access_key_encrypted = :access, aws_secret_key_encrypted = :secret, aws_region = :region, updated_at = :updated',
-                ExpressionAttributeValues={
-                    ':access': encrypted_access,
-                    ':secret': encrypted_secret,
-                    ':region': aws_region,
-                    ':updated': datetime.now().isoformat()
-                }
-            )
-            if self.use_secrets_manager:
-                try:
-                    success = self.secrets_manager.update_credentials(
-                        client_id=aws_account_id,
-                        access_key=aws_access_key,
-                        secret_key=aws_secret_key,
-                        aws_region=aws_region
-                    )
-
-                    if success:
-                        logger.info(f"Credentials updated in Secrets Manager")
-                    else:
-                        logger.warning(f"Failed to update Secrets Manager")
-                except Exception as e:
-                    logger.error(f"Secrets Manager update error: {e}")
-
-            self.cache.delete(f"client:{aws_account_id}")
-            self.cache.delete(f"credentials:{aws_account_id}")
-
-            logger.info(f"Updated credentials for {aws_account_id}")
-            return True
-
-        except Exception as e:
-            logger.error(f"Error updating credentials: {e}")
-            return False
-
-
-    async def update_client_status(self, aws_account_id: str, status: str) -> bool:
-        try:
-            valid_statuses = ['active', 'suspended', 'deleted']
-            if status not in valid_statuses:
-                raise ValueError(f"Invalid status. Must be one of: {valid_statuses}")
-
-            self.table.update_item(
-                Key={'pk': f"CLIENT#{aws_account_id}", 'sk': 'METADATA'},
-                UpdateExpression='SET #status = :status, updated_at = :updated',
-                ExpressionAttributeNames={'#status': 'status'},
-                ExpressionAttributeValues={
-                    ':status': status,
-                    ':updated': datetime.now().isoformat()
-                }
+            response = self.table.scan(
+                FilterExpression=Attr('notification_preferences').eq(True) & Attr('sk').eq('METADATA')
             )
 
-            logger.info(f"Updated client {aws_account_id} status to {status}")
-            return True
+            # Return without credentials
+            clients = []
+            for item in response.get('Items', []):
+                # Remove sensitive data
+                item.pop('aws_access_key_encrypted', None)
+                item.pop('aws_secret_key_encrypted', None)
+                clients.append(item)
 
-        except Exception as e:
-            logger.error(f"Error updating client status: {e}")
-            return False
+            return clients
 
-    async def update_last_collection(self, aws_account_id: str) -> bool:
-        try:
-            self.table.update_item(
-                Key={'pk': f"CLIENT#{aws_account_id}", 'sk': 'METADATA'},
-                UpdateExpression='SET last_collection = :timestamp, updated_at = :updated',
-                ExpressionAttributeValues={
-                    ':timestamp': datetime.now().isoformat(),
-                    ':updated': datetime.now().isoformat()
-                }
-            )
-            return True
+        except  Exception as e:
+            logger.error(f"Error getting clients with notifications enabled: {e}")
+            return []
 
-        except Exception as e:
-            logger.error(f"Error updating last collection time: {e}")
-            return False
-
-    async def update_notification_preferences(self,
-                                              aws_account_id: str,
-                                              preferences: Dict) -> bool:
-        try:
-            self.table.update_item(
-                Key={'pk': f"CLIENT#{aws_account_id}", 'sk': 'METADATA'},
-                UpdateExpression='SET notification_preferences = :prefs, updated_at = :updated',
-                ExpressionAttributeValues={
-                    ':prefs': preferences,
-                    ':updated': datetime.now().isoformat()
-                }
-            )
-
-            # Invalidate cache_client
-            self.cache.delete(f"client:{aws_account_id}")
-
-            logger.info(f"Updated notification preferences for {aws_account_id}")
-            return True
-
-        except Exception as e:
-            logger.error(f"Error updating notification preferences: {e}")
-            return False
-
-    async def delete_client(self, aws_account_id: str) -> bool:
-        """
-        Delete client from BOTH places:
-        - DynamoDB
-        - Secrets Manager (if enabled)
-        """
-        try:
-            if self.use_secrets_manager:
-                try:
-                    self.secrets_manager.delete_credentials(
-                        aws_account_id,
-                        force_delete=False  # 30-day recovery window
-                    )
-                    logger.info(f"Credentials deleted from Secrets Manager (30-day recovery)")
-                except Exception as e:
-                    logger.error(f"Secrets Manager delete error: {e}")
-
-            self.cache.delete(f"client:{aws_account_id}")
-            self.cache.delete_pattern(f"client:{aws_account_id}:*")
-            self.table.delete_item(
-                Key={
-                    'pk': f"CLIENT#{aws_account_id}",
-                    'sk': 'METADATA'
-                }
-            )
-
-            logger.info(f"Client {aws_account_id} deleted successfully")
-            return True
-
-        except Exception as e:
-            logger.error(f"Error deleting client: {e}")
-            return False
-
-    async def set_email_verification_token(self,
-                                           aws_account_id: str,
-                                           token: str,
-                                           expires_at: datetime) -> bool:
-        """Set email verification token"""
-        try:
-            self.table.update_item(
-                Key={'pk': f"CLIENT#{aws_account_id}", 'sk': 'METADATA'},
-                UpdateExpression='SET email_verification_token = :token, email_verification_expires = :expires, updated_at = :updated',
-                ExpressionAttributeValues={
-                    ':token': token,
-                    ':expires': expires_at.isoformat(),
-                    ':updated': datetime.now().isoformat()
-                }
-            )
-
-            # Invalidate cache_client
-            self.cache.delete(f"client:{aws_account_id}")
-
-            logger.info(f"Set verification token for {aws_account_id}")
-            return True
-
-        except Exception as e:
-            logger.error(f"Error setting verification token: {e}")
-            return False
-
-    async def verify_email(self, aws_account_id: str) -> bool:
-        """Mark email as verified"""
-        try:
-            self.table.update_item(
-                Key={'pk': f"CLIENT#{aws_account_id}", 'sk': 'METADATA'},
-                UpdateExpression='SET email_verified = :verified, email_verification_token = :empty, updated_at = :updated',
-                ExpressionAttributeValues={
-                    ':verified': True,
-                    ':empty': '',
-                    ':updated': datetime.now().isoformat()
-                }
-            )
-
-            # Invalidate cache_client
-            self.cache.delete(f"client:{aws_account_id}")
-
-            logger.info(f"Email verified for {aws_account_id}")
-            return True
-
-        except Exception as e:
-            logger.error(f"Error verifying email: {e}")
-            return False
 
     async def get_client_by_verification_token(self, token: str) -> Optional[Dict]:
         """Get client by email verification token"""
@@ -607,6 +436,245 @@ class ClientModel(BaseModel):
         except Exception as e:
             logger.error(f"Error getting credentials for {aws_account_id}: {e}")
             return None
+
+    async def update_credentials(self,
+                                 aws_account_id: str,
+                                 aws_access_key: str,
+                                 aws_secret_key: str,
+                                 aws_region: str = "us-east-1") -> bool:
+        """
+        Update credentials in BOTH places:
+        - DynamoDB (always)
+        - Secrets Manager (if enabled)
+        """
+        try:
+            encrypted_access = self.encryption.encrypt_credential(aws_access_key)
+            encrypted_secret = self.encryption.encrypt_credential(aws_secret_key)
+
+            self.table.update_item(
+                Key={'pk': f"CLIENT#{aws_account_id}", 'sk': 'METADATA'},
+                UpdateExpression='SET aws_access_key_encrypted = :access, aws_secret_key_encrypted = :secret, aws_region = :region, updated_at = :updated',
+                ExpressionAttributeValues={
+                    ':access': encrypted_access,
+                    ':secret': encrypted_secret,
+                    ':region': aws_region,
+                    ':updated': datetime.now().isoformat()
+                }
+            )
+            if self.use_secrets_manager and self.secrets_manager:
+                try:
+                    # Run in thread pool to avoid blocking event loop
+                    success = await self.secrets_manager.update_credentials_async(
+                        client_id=aws_account_id,
+                        access_key=aws_access_key,
+                        secret_key=aws_secret_key,
+                        aws_region=aws_region
+                    )
+
+                    if success:
+                        logger.info(f"Credentials updated in Secrets Manager")
+                    else:
+                        logger.warning(f"Failed to update Secrets Manager")
+                except Exception as e:
+                    logger.error(f"Secrets Manager update error: {e}")
+
+            self.cache.delete(f"client:{aws_account_id}")
+            self.cache.delete(f"credentials:{aws_account_id}")
+
+            logger.info(f"Updated credentials for {aws_account_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error updating credentials: {e}")
+            return False
+
+    async def update_client_status(self, aws_account_id: str, status: str) -> bool:
+        try:
+            valid_statuses = ['active', 'suspended', 'deleted']
+            if status not in valid_statuses:
+                raise ValueError(f"Invalid status. Must be one of: {valid_statuses}")
+
+            self.table.update_item(
+                Key={'pk': f"CLIENT#{aws_account_id}", 'sk': 'METADATA'},
+                UpdateExpression='SET #status = :status, updated_at = :updated',
+                ExpressionAttributeNames={'#status': 'status'},
+                ExpressionAttributeValues={
+                    ':status': status,
+                    ':updated': datetime.now().isoformat()
+                }
+            )
+
+            logger.info(f"Updated client {aws_account_id} status to {status}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error updating client status: {e}")
+            return False
+
+    async def update_last_collection(self, aws_account_id: str) -> bool:
+        try:
+            self.table.update_item(
+                Key={'pk': f"CLIENT#{aws_account_id}", 'sk': 'METADATA'},
+                UpdateExpression='SET last_collection = :timestamp, updated_at = :updated',
+                ExpressionAttributeValues={
+                    ':timestamp': datetime.now().isoformat(),
+                    ':updated': datetime.now().isoformat()
+                }
+            )
+            return True
+
+        except Exception as e:
+            logger.error(f"Error updating last collection time: {e}")
+            return False
+
+    async def update_notification_preferences(self,
+                                              aws_account_id: str,
+                                              enabled: bool = True) -> bool:
+        try:
+            self.table.update_item(
+                Key={'pk': f"CLIENT#{aws_account_id}", 'sk': 'METADATA'},
+                UpdateExpression='SET notification_preferences = :prefs, updated_at = :updated',
+                ExpressionAttributeValues={
+                    ':prefs': enabled,
+                    ':updated': datetime.now().isoformat()
+                }
+            )
+
+            # Invalidate cache
+            self.cache.delete(f"client:{aws_account_id}")
+
+            logger.info(f"Updated notification preferences for {aws_account_id} to {enabled}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error updating notification preferences: {e}")
+            return False
+
+    async def update_client_email(self,
+                                aws_account_id: str,
+                                email: str) -> bool:
+        try:
+            client = await self.get_client_by_email(email)
+            if not client :
+                self.table.update_item(
+                    Key={'pk': f"CLIENT#{aws_account_id}", 'sk': 'METADATA'},
+                    UpdateExpression='SET email = :email, updated_at = :updated, email_verified = :verified',
+                    ExpressionAttributeValues={
+                        ':email': email,
+                        ':updated': datetime.now().isoformat(),
+                        ':verified': False
+                    }
+                )
+            else:
+                logger.error(f"Email already exists: {email}")
+                return False
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Error updating email: {e}")
+            return False
+
+
+    async def delete_client(self, aws_account_id: str) -> bool:
+        """
+        Delete client from BOTH places:
+        - DynamoDB
+        - Secrets Manager (if enabled)
+        """
+        try:
+            if self.use_secrets_manager and self.secrets_manager:
+                try:
+                    # Run in thread pool to avoid blocking event loop
+                    await self.secrets_manager.delete_credentials_async(
+                        aws_account_id,
+                        force_delete=False  # 30-day recovery window
+                    )
+                    logger.info(f"Credentials deleted from Secrets Manager (30-day recovery)")
+                except Exception as e:
+                    logger.error(f"Secrets Manager delete error: {e}")
+
+            self.cache.delete(f"client:{aws_account_id}")
+            self.cache.delete_pattern(f"client:{aws_account_id}:*")
+            self.table.delete_item(
+                Key={
+                    'pk': f"CLIENT#{aws_account_id}",
+                    'sk': 'METADATA'
+                }
+            )
+
+            logger.info(f"Client {aws_account_id} deleted successfully")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error deleting client: {e}")
+            return False
+
+    async def set_email_verification_token(self,
+                                           aws_account_id: str,
+                                           token: str,
+                                           expires_at: datetime) -> bool:
+        """Set email verification token"""
+        try:
+            self.table.update_item(
+                Key={'pk': f"CLIENT#{aws_account_id}", 'sk': 'METADATA'},
+                UpdateExpression='SET email_verification_token = :token, email_verification_expires = :expires, updated_at = :updated',
+                ExpressionAttributeValues={
+                    ':token': token,
+                    ':expires': expires_at.isoformat(),
+                    ':updated': datetime.now().isoformat()
+                }
+            )
+
+            # Invalidate cache_client
+            self.cache.delete(f"client:{aws_account_id}")
+
+            logger.info(f"Set verification token for {aws_account_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error setting verification token: {e}")
+            return False
+
+    async def verify_email(self, token: str) -> Optional[str]:
+
+        """
+        Verify email using token and mark as verified
+        Returns aws_account_id on success, None on failure
+        """
+
+        try:
+
+            # Get client by verification token
+            client = await self.get_client_by_verification_token(token)
+            if not client:
+                logger.warning(f"Invalid or expired verification token")
+                return None
+
+            aws_account_id = client['aws_account_id']
+            # Mark as verified
+            self.table.update_item(
+                Key={'pk': f"CLIENT#{aws_account_id}", 'sk': 'METADATA'},
+                UpdateExpression='SET email_verified = :verified, email_verification_token = :empty, updated_at = :updated',
+                ExpressionAttributeValues={
+                    ':verified': True,
+                    ':empty': '',
+                    ':updated': datetime.now().isoformat()
+                }
+            )
+
+            # Invalidate cache_client
+            self.cache.delete(f"client:{aws_account_id}")
+            logger.info(f"Email verified for {aws_account_id}")
+
+            return aws_account_id
+
+        except Exception as e:
+
+            logger.error(f"Error verifying email: {e}")
+
+            return None
+
 
 
 class MetricsModel(BaseModel):

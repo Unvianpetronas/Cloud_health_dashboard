@@ -274,6 +274,18 @@ code {
   opacity: 1;
 }
 
+/* Ensure dropdowns using card styling do not affect layout */
+.user-menu-dropdown {
+  position: absolute;
+  overflow: visible;
+  z-index: 60;
+}
+
+.navbar--header {
+  z-index: 60;
+  position: relative;
+}
+
 /* Cosmic Animations */
 .animate-float {
   animation: float 6s ease-in-out infinite;
@@ -349,6 +361,7 @@ code {
 .backdrop-blur-cosmic { backdrop-filter: blur(var(--blur-strong)); }
 .shadow-cosmic-glow { box-shadow: 0 0 20px var(--pri-glow); }
 .shadow-cosmic-glow-lg { box-shadow: 0 0 30px var(--pri-glow), 0 0 40px var(--pri-glow); }
+.shadow-cosmic-soft { box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45); }
 .glow-border { border: 1px solid rgba(110, 168, 255, 0.3); }
 .glow-border-hover:hover { border-color: rgba(110, 168, 255, 0.6); }
 
@@ -401,5 +414,21 @@ section {
     --txt-1: #ffffff;
     --txt-2: #e0e0e0;
     --border: #404040;
+  }
+}
+
+/* Toast slide-in animation */
+.animate-slide-in-right {
+  animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
   }
 }

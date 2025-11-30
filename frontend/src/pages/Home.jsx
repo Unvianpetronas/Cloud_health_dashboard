@@ -1,200 +1,166 @@
-import React, { useState, useCallback } from 'react';
-import { 
-  DollarSign, 
-  Server, 
-  AlertTriangle, 
-  Zap,
-  Activity,
-  Database,
-  Shield,
-  TrendingUp
-} from 'lucide-react';
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
 
-// Import components
 import Header from '../components/common/Header';
-import MetricsCard from '../components/dashboard/MetricsCard';
-import CostChart from '../components/charts/CostChart';
-import ServiceHealthChart from '../components/charts/ServiceHealthChart';
-import PerformanceChart from '../components/charts/PerformanceChart';
-import AlertsPanel from '../components/dashboard/AlertsPanel';
-import ServiceStatusList from '../components/dashboard/ServiceStatusList';
-import Loading from '../components/common/Loading';
-
-// Import hooks
-import useDashboardData from '../hooks/useDashboardData';
 import { useAuth } from '../contexts/AuthContext';
 
 const Home = () => {
-  const [selectedTimeRange, setSelectedTimeRange] = useState('24h');
-  const { user, logout } = useAuth();
-  const { data, loading, error, lastUpdated, refresh } = useDashboardData(selectedTimeRange);
-
-  // Prepare metrics data with icons
-  const metricsData = data.metrics ? data.metrics.map((metric, index) => {
-    const icons = [DollarSign, Server, AlertTriangle, Zap];
-    const iconColors = ["#3b82f6", "#10b981", "#ef4444", "#0ea5e9"];
-    const iconBgColors = ["#dbeafe", "#d1fae5", "#fef2f2", "#f0f9ff"];
-    
-    return {
-      ...metric,
-      icon: icons[index],
-      iconColor: iconColors[index],
-      iconBgColor: iconBgColors[index]
-    };
-  }) : [];
-
-  const handleRefresh = useCallback(() => {
-    refresh();
-  }, [refresh]);
-
-  const handleTimeRangeChange = useCallback((timeRange) => {
-    setSelectedTimeRange(timeRange);
-  }, []);
-
-  // Show loading state
-  if (loading && !data.metrics) {
-    return (
-      <div className="min-h-screen">
-        <Header
-          onRefresh={handleRefresh}
-          refreshing={loading}
-          selectedTimeRange={selectedTimeRange}
-          onTimeRangeChange={handleTimeRangeChange}
-        />
-        <main className="container mx-auto px-6 flex items-center justify-center min-h-96">
-          <div className="card p-8 text-center">
-            <Loading size="lg" text="Loading dashboard data..." />
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  // Show error state
-  if (error) {
-    return (
-      <div className="min-h-screen">
-        <Header
-          onRefresh={handleRefresh}
-          refreshing={loading}
-          selectedTimeRange={selectedTimeRange}
-          onTimeRangeChange={handleTimeRangeChange}
-        />
-        <main className="container mx-auto px-6 flex items-center justify-center min-h-96">
-          <div className="card p-8 text-center">
-            <AlertTriangle size={48} className="mx-auto text-red-500 mb-4 animate-pulse" />
-            <h3 className="text-lg font-medium text-cosmic-txt-1 mb-2">Failed to load dashboard</h3>
-            <p className="text-cosmic-txt-2 mb-4">{error}</p>
-            <button
-              onClick={handleRefresh}
-              className="btn btn-primary"
-            >
-              Try Again
-            </button>
-          </div>
-        </main>
-      </div>
-    );
-  }
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen flex flex-col">
       <Header
-        onRefresh={handleRefresh}
-        refreshing={loading}
-        selectedTimeRange={selectedTimeRange}
-        onTimeRangeChange={handleTimeRangeChange}
+        title="AWS Cloud Health Dashboard"
+        showNavigation={true}
       />
 
-      {/* Cosmic Hero Section */}
-      <section className="hero">
-        <div className="container">
-          <div className="badge mb-6 animate-fade-in">
-            ✨ New Features Available
-          </div>
-          <h1 className="hero-title">
-            AWS Cloud Health
-            <br />
-            Dashboard
-          </h1>
-          <p className="hero-subtitle">
-            Monitor your cloud infrastructure with real-time insights, performance metrics, 
-            and intelligent alerts in a beautiful cosmic interface.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mt-8">
-            <button className="btn btn-primary px-8 py-3 animate-float">
-              View Dashboard
-            </button>
-            <button className="btn btn-ghost px-8 py-3">
-              Learn More
-            </button>
-          </div>
-          
-          {/* Trusted by section */}
-          <div className="mt-16 pt-8 border-t border-cosmic-border/30">
-            <p className="text-cosmic-muted text-sm mb-6">Trusted by leading organizations</p>
-            <div className="flex flex-wrap justify-center items-center gap-8 opacity-60">
-              <div className="text-cosmic-txt-2 font-semibold">AWS</div>
-              <div className="text-cosmic-txt-2 font-semibold">Microsoft</div>
-              <div className="text-cosmic-txt-2 font-semibold">Google Cloud</div>
-              <div className="text-cosmic-txt-2 font-semibold">IBM</div>
-              <div className="text-cosmic-txt-2 font-semibold">Oracle</div>
+      <main className="flex-1">
+        {/* Cosmic Hero Section */}
+        <section className="hero">
+          <div className="container">
+            <div className="badge mb-6 animate-fade-in">
+              <span className="text-cosmic-txt-2">New Features Available</span>
+            </div>
+            <h1 className="hero-title">
+              AWS Cloud Health
+              <br />
+              Dashboard
+            </h1>
+            <p className="hero-subtitle">
+              Monitor your cloud infrastructure with real-time insights, performance metrics, 
+              and intelligent alerts in a beautiful cosmic interface.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mt-8">
+              <button
+                className="btn btn-primary px-8 py-3 animate-float"
+                onClick={() => navigate('/dashboard')}
+              >
+                View Dashboard
+              </button>
+            </div>
+            
+            {/* Trusted by section */}
+            <div className="mt-16 pt-8 pb-10 border-t border-cosmic-border/30">
+              <p className="text-cosmic-muted text-sm mb-6">Trusted by leading organizations</p>
+              <div className="flex flex-wrap justify-center items-center gap-8 opacity-60">
+                <div className="text-cosmic-txt-2 font-semibold">AWS</div>
+                <div className="text-cosmic-txt-2 font-semibold">Microsoft</div>
+                <div className="text-cosmic-txt-2 font-semibold">Google Cloud</div>
+                <div className="text-cosmic-txt-2 font-semibold">IBM</div>
+                <div className="text-cosmic-txt-2 font-semibold">Oracle</div>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <main className="container mx-auto px-6">
-        {/* Metrics Cards */}
-        <section className="py-16">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            {metricsData.map((metric, index) => (
-              <div key={index} className="card p-6 animate-fade-in" style={{animationDelay: `${index * 0.1}s`}}>
-                <MetricsCard
-                  title={metric.title}
-                  value={metric.value}
-                  change={metric.change}
-                  changeType={metric.changeType}
-                  icon={metric.icon}
-                  iconColor={metric.iconColor}
-                  iconBgColor={metric.iconBgColor}
-                />
+        {/* Developer Team Section */}
+        <section className="container mx-auto px-6 mt-[140px] sm:mt-[160px] pb-20 mb-20 lg:mb-28">
+          <div className="max-w-3xl mx-auto text-center space-y-3 mb-14">
+            <p className="text-xs uppercase tracking-[0.35em] text-cosmic-muted">
+              THE TEAM BEHIND THE DASHBOARD
+            </p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-cosmic-txt-1">
+              Meet the Developers
+            </h2>
+            <p className="text-sm sm:text-base text-cosmic-txt-2 leading-relaxed">
+              A small but passionate team of cloud enthusiasts and frontend engineers
+              who designed and built this AWS Cloud Health experience.
+            </p>
+          </div>
+
+          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4 justify-items-center">
+            {[
+              { name: 'Developer 1', role: 'Cloud / Backend Engineer', image: '/dev_pic1.jpg' },
+              { name: 'Developer 2', role: 'Frontend / UI Engineer', image: '/dev_pic2.jpg' },
+              { name: 'Developer 3', role: 'DevOps / Infrastructure', image: '/dev_pic3.jpg' },
+              { name: 'Developer 4', role: 'QA / Automation Engineer', image: '/dev_pic4.jpg' },
+            ].map((dev, idx) => (
+              <div
+                key={idx}
+                className="w-full max-w-xs bg-cosmic-card border border-cosmic-border/60 rounded-2xl p-6 shadow-cosmic-soft hover:shadow-cosmic-glow transition-transform duration-200 hover:-translate-y-1 backdrop-blur-md"
+              >
+                <div className="flex flex-col items-center text-center space-y-4">
+                  <img
+                    src={dev.image}
+                    alt={dev.name}
+                    className={`w-28 h-28 rounded-3xl object-cover shadow-lg shadow-blue-500/40 border border-cosmic-border/50 ${
+                      dev.name === 'Developer 3' ? 'object-top' : 'object-center'
+                    }`}
+                  />
+
+                  <div>
+                    <h3 className="text-lg font-semibold text-cosmic-txt-1">
+                      {dev.name}
+                    </h3>
+                    <p className="text-sm text-cosmic-txt-2">
+                      {dev.role}
+                    </p>
+                  </div>
+
+                  <p className="text-xs text-cosmic-muted leading-relaxed">
+                    Replace this text with a short bio or responsibilities for each
+                    member, such as AWS services handled, features implemented, or
+                    favorite cloud tools.
+                  </p>
+                </div>
               </div>
             ))}
           </div>
         </section>
-
-        {/* Charts Section */}
-        <section className="py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-            <div className="lg:col-span-2 card p-6">
-              <CostChart data={data.costs || []} />
-            </div>
-            <div className="card p-6">
-              <ServiceHealthChart data={data.serviceHealth || []} />
-            </div>
-          </div>
-        </section>
-
-        {/* Performance Chart */}
-        <section className="py-8">
-          <div className="card p-6 mb-8">
-            <PerformanceChart data={data.performance || []} />
-          </div>
-        </section>
-
-        {/* Bottom Section */}
-        <section className="py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="card p-6">
-              <AlertsPanel alerts={data.alerts || []} />
-            </div>
-            <div className="card p-6">
-              <ServiceStatusList services={data.serviceStatus || []} />
-            </div>
-          </div>
-        </section>
       </main>
+
+      <footer className="border-t border-cosmic-border/40 bg-cosmic-bg-2/80 backdrop-blur-md">
+        <div className="container mx-auto px-6 py-8 sm:py-10">
+          <div className="flex flex-col gap-8 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-3 max-w-sm">
+              <h3 className="text-lg font-semibold text-cosmic-txt-1">
+                AWS Cloud Health Dashboard
+              </h3>
+              <p className="text-sm text-cosmic-txt-2 leading-relaxed">
+                Monitor, optimize, and secure your AWS workloads with a modern,
+                cosmic-inspired observability experience.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-8 text-sm">
+              <div className="space-y-2">
+                <p className="text-xs font-semibold tracking-[0.25em] text-cosmic-muted uppercase">
+                  Services
+                </p>
+                <ul className="space-y-1.5 text-cosmic-txt-2">
+                  <li className="hover:text-cosmic-accent cursor-pointer">Dashboard</li>
+                  <li className="hover:text-cosmic-accent cursor-pointer">Cost Explorer</li>
+                  <li className="hover:text-cosmic-accent cursor-pointer">S3 Buckets</li>
+                  <li className="hover:text-cosmic-accent cursor-pointer">Architecture</li>
+                </ul>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-semibold tracking-[0.25em] text-cosmic-muted uppercase">
+                  Contact
+                </p>
+                <p className="text-cosmic-txt-2">
+                  Phone: 0123456789<br />
+                  
+                </p>
+                <p className="text-cosmic-muted text-xs">
+                  Email: cloud-health@university.demo
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-8 pt-4 border-t border-cosmic-border/40 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <p className="text-xs text-cosmic-muted">
+              © {new Date().getFullYear()} AWS Cloud Health Dashboard. All rights reserved.
+            </p>
+            <p className="text-xs text-cosmic-muted">
+              Crafted with care by the Cloud Health Dev Team.
+            </p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };

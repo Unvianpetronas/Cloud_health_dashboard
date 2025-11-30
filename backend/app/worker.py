@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from typing import Dict
+from datetime import datetime, timedelta
 from app.services.cache_client.redis_client import cache
 from app.database.models import (
     ClientModel,
@@ -16,7 +17,8 @@ from app.services.aws.costexplorer import CostExplorerScanner
 from app.services.aws.s3 import S3Scanner
 from app.services.aws.cloudwatch import CloudWatchScanner
 from app.services.analytics.architecture_analyzer import ArchitectureAnalyzer
-from app.utils.jwt_handler import *
+from app.utils.jwt_handler import decode_refresh_token
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -228,8 +230,8 @@ class CloudHealthWorker:
             if not client or not client.get('email_verified'):
                 return
 
-            prefs = client.get('notification_preferences', {})
-            if not prefs.get('critical_alerts', True):
+            prefs = client.get('notification_preferences', True)
+            if not prefs:
                 return
 
             critical_findings = [
@@ -507,7 +509,7 @@ class CloudHealthWorker:
                         region=region,
                         namespace='AWS/EC2',
                         metric_name='CPUUtilization',
-                        dimensions={'Name': 'InstanceId', 'Value': instance_id},
+                        dimension={'Name': 'InstanceId', 'Value': instance_id},
                         period=3600
                     )
                     cloudwatch_metrics['CPUUtilization'] = cpu_metrics
@@ -584,10 +586,20 @@ class CloudHealthWorker:
         except Exception as e:
             logger.error(f"[{self.aws_account_id}] Collection cycle failed: {e}", exc_info=True)
 
-    async def start(self):
+    async def start(self, initial_delay: int = 5):
+        """
+        Start the worker with an optional initial delay.
+
+        Args:
+            initial_delay: Seconds to wait before first collection (default: 5)
+                          This prevents blocking the login response.
+        """
         logger.info(f"[{self.aws_account_id}] Cloud Health Worker Starting!")
         logger.info(f"[{self.aws_account_id}] Collection interval: {settings.WORKER_COLLECTION_INTERVAL}s")
         logger.info(f"[{self.aws_account_id}] JWT validation: Enabled (12 hours access, 7 days refresh)")
+
+        if initial_delay > 0:
+            logger.info(f"[{self.aws_account_id}] Initial collection will start in {initial_delay} seconds...")
 
         try:
             # Validate token before first collection
@@ -595,7 +607,11 @@ class CloudHealthWorker:
                 logger.error(f"[{self.aws_account_id}] Initial token validation failed - worker cannot start")
                 return
 
-            # Run first collection immediately
+            # Wait before first collection to allow login response to return quickly
+            if initial_delay > 0:
+                await asyncio.sleep(initial_delay)
+
+            # Run first collection
             await self.run_collection_cycle()
 
 

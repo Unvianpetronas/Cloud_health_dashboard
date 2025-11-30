@@ -14,6 +14,11 @@ logger = logging.getLogger(__name__)
 class SendVerificationRequest(BaseModel):
     aws_account_id: str
 
+class NotificationToggleRequest(BaseModel):
+    enabled: bool
+
+class UpdateEmailRequest(BaseModel):
+    email: str
 
 @router.post("/email/send-verification", tags=["Email"])
 async def send_verification_email(
@@ -236,4 +241,87 @@ async def resend_verification_email(
         raise
     except Exception as e:
         logger.error(f"Error resending verification email: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/email/notification", tags=["Email"])
+async def toggle_notification(
+        request: NotificationToggleRequest,
+        current_aws_account_id: str = Depends(get_current_client_id)
+):
+    """
+    Toggle email notifications on/off
+    Request body: { "enabled": true/false }
+    """
+    try:
+        client_model = ClientModel()
+        client = await client_model.get_client_by_aws_account_id(current_aws_account_id)
+
+        if not client:
+            raise HTTPException(status_code=404, detail="Client not found")
+
+        # Update notification preference
+        success = await client_model.update_notification_preferences(
+            client.get('aws_account_id'),
+            enabled=request.enabled
+        )
+
+        if not success:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to update notification preferences"
+            )
+
+        logger.info(f"Notifications {'enabled' if request.enabled else 'disabled'} for {current_aws_account_id}")
+
+        return {
+            "success": True,
+            "message": f"Email notifications {'enabled' if request.enabled else 'disabled'} successfully",
+            "enabled": request.enabled
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating notifications: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/email/update", tags=["Email"])
+async def update_email(
+        request: UpdateEmailRequest,
+        current_aws_account_id: str = Depends(get_current_client_id)
+):
+    """
+    Update authenticated user's email
+    """
+    try:
+        client_model = ClientModel()
+        client = await client_model.get_client_by_aws_account_id(current_aws_account_id)
+
+        if not client:
+            raise HTTPException(status_code=404, detail="Client not found")
+
+        # Update email
+        success = await client_model.update_client_email(
+            client.get('aws_account_id'),
+            request.email
+        )
+
+        if not success:
+            logger.error(f"Failed to update email for {current_aws_account_id}")
+            raise HTTPException(status_code=500, detail="Email already exist!")
+
+        logger.info(f"Email updated for {current_aws_account_id}")
+
+        return {
+            "success": True,
+            "message": "Email updated successfully",
+            "email": request.email
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating email: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

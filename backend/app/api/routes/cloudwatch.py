@@ -26,8 +26,8 @@ async def get_cloudwatch_metrics(
         client_provider: AWSClientProvider = Depends(get_aws_client_provider)
 ):
     """
-    Quét CloudWatch metrics trên tất cả các region.
-    Có thể chỉ định dimensions để lọc dữ liệu theo tài nguyên cụ thể.
+    Scan CloudWatch metrics across all regions.
+    Can specify dimensions to filter data by specific resource.
     """
 
     try:
@@ -44,7 +44,7 @@ async def get_cloudwatch_metrics(
                     detail="Invalid dimensions format. Use Name:Value,Name:Value"
                 )
 
-        # --- Prepare cache_client key ---
+        # --- Prepare cache key ---
         dim_key = dimensions or "none"
         cache_key = f"cloudwatch:{namespace}:{metric_name}:{period}:{stat}:{dim_key}"
 
@@ -54,8 +54,8 @@ async def get_cloudwatch_metrics(
                 logger.info("Returning cached CloudWatch data")
                 return {
                     **cache_data,
-                    "source": "cache_client",
-                    "cache_client": True
+                    "source": "cache",
+                    "cached": True
                 }
 
         # --- Set time range ---
@@ -83,7 +83,7 @@ async def get_cloudwatch_metrics(
         return {
             **report,
             "source": "aws",
-            "cache_client": False
+            "cached": False
         }
 
     except HTTPException:

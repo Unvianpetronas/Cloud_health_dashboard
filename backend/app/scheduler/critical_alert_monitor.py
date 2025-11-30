@@ -40,9 +40,9 @@ class CriticalAlertMonitor:
 
             for client in clients:
                 try:
-                    # Check if user has critical alerts enabled
-                    notification_prefs = client.get('notification_preferences', {})
-                    if not notification_prefs.get('critical_alerts', False):
+                    # Check if user has alerts enabled
+                    notification_prefs = client.get('notification_preferences', False)
+                    if not notification_prefs:
                         continue
 
                     # Check if email verified

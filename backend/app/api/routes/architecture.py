@@ -6,7 +6,7 @@ from app.services.aws.guardduty import GuardDutyScanner
 from app.services.aws.costexplorer import CostExplorerScanner
 from app.services.aws.cloudwatch import CloudWatchScanner
 from app.services.analytics.architecture_analyzer import ArchitectureAnalyzer
-from app.api.middleware.dependency import get_aws_client_provider
+from app.api.middleware.dependency import get_aws_client_provider, get_current_client_id
 from app.services.cache_client.redis_client import cache
 from app.database.dynamodb import DynamoDBConnection
 import asyncio
@@ -21,6 +21,7 @@ router = APIRouter()
 @router.get("/architecture/analyze", tags=["Architecture"])
 async def analyze_architecture(
     client_provider: AWSClientProvider = Depends(get_aws_client_provider),
+    client_id: str = Depends(get_current_client_id),
     force_refresh: bool = Query(False, description="Force fresh data collection"),
     save_report: bool = Query(True, description="Save analysis report to database")
 ):
@@ -39,19 +40,19 @@ async def analyze_architecture(
     """
     try:
         # Check cache first
-        cache_key = f'architecture:analysis:{client_provider.client_id}'
+        cache_key = f'architecture:analysis:{client_id}'
 
         if not force_refresh:
             cached_report = cache.get(cache_key)
             if cached_report:
-                logger.info(f"Returning cached architecture analysis for client {client_provider.client_id}")
+                logger.info(f"Returning cached architecture analysis for client {client_id}")
                 return {
                     **cached_report,
                     'source': 'cache',
                     'cached': True
                 }
 
-        logger.info(f"Starting comprehensive architecture analysis for client {client_provider.client_id}")
+        logger.info(f"Starting comprehensive architecture analysis for client {client_id}")
 
         # Collect data from all AWS services in parallel
         loop = asyncio.get_running_loop()
@@ -161,7 +162,7 @@ async def analyze_architecture(
                 cloudwatch_metrics = {}
 
         # Initialize analyzer and run comprehensive analysis
-        analyzer = ArchitectureAnalyzer(client_id=client_provider.client_id)
+        analyzer = ArchitectureAnalyzer(client_id=client_id)
 
         analysis_report = await analyzer.analyze_full_architecture(
             ec2_data=ec2_instances,
@@ -177,7 +178,7 @@ async def analyze_architecture(
         if save_report:
             try:
                 await _save_architecture_report(
-                    client_id=client_provider.client_id,
+                    client_id=client_id,
                     report=analysis_report
                 )
                 logger.info("Architecture report saved to database")
@@ -203,19 +204,20 @@ async def analyze_architecture(
 
 @router.get("/architecture/score", tags=["Architecture"])
 async def get_architecture_score(
-    client_provider: AWSClientProvider = Depends(get_aws_client_provider)
+    client_provider: AWSClientProvider = Depends(get_aws_client_provider),
+    client_id: str = Depends(get_current_client_id)
 ):
     """
     Get quick architecture health score without full analysis.
     Returns cached score if available, otherwise triggers full analysis.
     """
     try:
-        cache_key = f'architecture:analysis:{client_provider.client_id}'
+        cache_key = f'architecture:analysis:{client_id}'
         cached_report = cache.get(cache_key)
 
         if cached_report:
             return {
-                'client_id': client_provider.client_id,
+                'client_id': client_id,
                 'overall_score': cached_report.get('overall_score', 0),
                 'overall_rating': cached_report.get('overall_rating', 'Unknown'),
                 'analysis_timestamp': cached_report.get('analysis_timestamp'),
@@ -225,12 +227,13 @@ async def get_architecture_score(
             # Trigger full analysis
             full_report = await analyze_architecture(
                 client_provider=client_provider,
+                client_id=client_id,
                 force_refresh=False,
                 save_report=True
             )
 
             return {
-                'client_id': client_provider.client_id,
+                'client_id': client_id,
                 'overall_score': full_report.get('overall_score', 0),
                 'overall_rating': full_report.get('overall_rating', 'Unknown'),
                 'analysis_timestamp': full_report.get('analysis_timestamp'),
@@ -248,6 +251,7 @@ async def get_architecture_score(
 @router.get("/architecture/recommendations", tags=["Architecture"])
 async def get_recommendations(
     client_provider: AWSClientProvider = Depends(get_aws_client_provider),
+    client_id: str = Depends(get_current_client_id),
     priority: Optional[str] = Query(None, description="Filter by priority: CRITICAL, HIGH, MEDIUM, LOW")
 ):
     """
@@ -255,13 +259,14 @@ async def get_recommendations(
     Can filter by priority level.
     """
     try:
-        cache_key = f'architecture:analysis:{client_provider.client_id}'
+        cache_key = f'architecture:analysis:{client_id}'
         cached_report = cache.get(cache_key)
 
         if not cached_report:
             # Trigger full analysis
             cached_report = await analyze_architecture(
                 client_provider=client_provider,
+                client_id=client_id,
                 force_refresh=False,
                 save_report=True
             )
@@ -277,7 +282,7 @@ async def get_recommendations(
             ]
 
         return {
-            'client_id': client_provider.client_id,
+            'client_id': client_id,
             'total_recommendations': len(recommendations),
             'recommendations': recommendations,
             'analysis_timestamp': cached_report.get('analysis_timestamp')
@@ -293,18 +298,20 @@ async def get_recommendations(
 
 @router.get("/architecture/cost-optimization", tags=["Architecture"])
 async def get_cost_optimization(
-    client_provider: AWSClientProvider = Depends(get_aws_client_provider)
+    client_provider: AWSClientProvider = Depends(get_aws_client_provider),
+    client_id: str = Depends(get_current_client_id)
 ):
     """
     Get detailed cost optimization analysis and potential savings.
     """
     try:
-        cache_key = f'architecture:analysis:{client_provider.client_id}'
+        cache_key = f'architecture:analysis:{client_id}'
         cached_report = cache.get(cache_key)
 
         if not cached_report:
             cached_report = await analyze_architecture(
                 client_provider=client_provider,
+                client_id=client_id,
                 force_refresh=False,
                 save_report=True
             )
@@ -319,7 +326,7 @@ async def get_cost_optimization(
         ]
 
         return {
-            'client_id': client_provider.client_id,
+            'client_id': client_id,
             'cost_analysis': cost_analysis,
             'recommendations': cost_recommendations,
             'analysis_timestamp': cached_report.get('analysis_timestamp')
@@ -335,18 +342,20 @@ async def get_cost_optimization(
 
 @router.get("/architecture/well-architected", tags=["Architecture"])
 async def get_well_architected_scores(
-    client_provider: AWSClientProvider = Depends(get_aws_client_provider)
+    client_provider: AWSClientProvider = Depends(get_aws_client_provider),
+    client_id: str = Depends(get_current_client_id)
 ):
     """
     Get AWS Well-Architected Framework pillar scores.
     """
     try:
-        cache_key = f'architecture:analysis:{client_provider.client_id}'
+        cache_key = f'architecture:analysis:{client_id}'
         cached_report = cache.get(cache_key)
 
         if not cached_report:
             cached_report = await analyze_architecture(
                 client_provider=client_provider,
+                client_id=client_id,
                 force_refresh=False,
                 save_report=True
             )
@@ -354,7 +363,7 @@ async def get_well_architected_scores(
         well_architected = cached_report.get('well_architected', {})
 
         return {
-            'client_id': client_provider.client_id,
+            'client_id': client_id,
             'well_architected_framework': well_architected,
             'analysis_timestamp': cached_report.get('analysis_timestamp')
         }

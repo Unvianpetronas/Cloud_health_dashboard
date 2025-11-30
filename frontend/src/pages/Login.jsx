@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Cloud, Eye, EyeOff, AlertCircle, Shield, Zap } from 'lucide-react';
+import { Cloud, Eye, EyeOff, AlertCircle, Shield, Zap, XCircle } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
+import Toast from '../components/common/Toast';
 
 const Login = () => {
   const { login, isAuthenticated, isLoading, error, clearError } = useAuth();
@@ -16,18 +17,151 @@ const Login = () => {
   const [showSecretKey, setShowSecretKey] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
+  const [toast, setToast] = useState(null);
 
   // Clear errors when component mounts
   useEffect(() => {
     clearError();
   }, [clearError]);
 
+  // Show toast when auth error occurs
+  useEffect(() => {
+    if (error) {
+      const { message, type } = getErrorMessage(error);
+      showToast(message, type);
+    }
+  }, [error]);
+
   // Redirect if already authenticated
   if (isAuthenticated) {
     return <Navigate to="/" replace />;
   }
 
-  // ✅ FIXED: Use correct field names
+  const showToast = (message, type = 'error') => {
+    setToast({ message, type });
+  };
+
+  const hideToast = () => {
+    setToast(null);
+  };
+
+  // Helper to get user-friendly error messages based on backend responses
+  const getErrorMessage = (errorText) => {
+    if (!errorText) {
+      return {
+        message: 'Authentication failed. Please check your credentials.',
+        type: 'error'
+      };
+    }
+
+    const lowerError = errorText.toLowerCase();
+
+    // Backend: 401 - Invalid AWS credentials
+    if (lowerError.includes('invalid aws credentials')) {
+      return {
+        message: '🔑 Invalid AWS credentials. Please verify your Access Key ID and Secret Access Key.',
+        type: 'error'
+      };
+    }
+
+    // Backend: 403 - Account suspended/inactive
+    if (lowerError.includes('account is suspended')) {
+      return {
+        message: '⛔ Your account has been suspended. Please contact support.',
+        type: 'error'
+      };
+    }
+
+    if (lowerError.includes('account is inactive')) {
+      return {
+        message: '💤 Your account is inactive. Please contact support to reactivate.',
+        type: 'warning'
+      };
+    }
+
+    if (lowerError.includes('account is')) {
+      return {
+        message: `🚫 ${errorText}. Please contact support.`,
+        type: 'error'
+      };
+    }
+
+    // Backend: 500 - Failed to create account
+    if (lowerError.includes('failed to create account')) {
+      return {
+        message: '❌ Failed to create your account. Please try again later.',
+        type: 'error'
+      };
+    }
+
+    // Backend: 500 - Internal server error
+    if (lowerError.includes('internal server error')) {
+      return {
+        message: '🔧 Server error. Our team has been notified. Please try again later.',
+        type: 'error'
+      };
+    }
+
+    // Backend: 401 - Invalid/expired refresh token
+    if (lowerError.includes('invalid or expired refresh token')) {
+      return {
+        message: '⏰ Your session has expired. Please log in again.',
+        type: 'warning'
+      };
+    }
+
+    // Backend: 401 - Client not found or inactive
+    if (lowerError.includes('client not found')) {
+      return {
+        message: '❓ Account not found. Please check your credentials.',
+        type: 'error'
+      };
+    }
+
+    // Network/Connection errors
+    if (lowerError.includes('network') || lowerError.includes('fetch') || lowerError.includes('connection')) {
+      return {
+        message: '🌐 Network error. Please check your internet connection and try again.',
+        type: 'error'
+      };
+    }
+
+    if (lowerError.includes('timeout')) {
+      return {
+        message: '⏱️ Connection timed out. Please try again.',
+        type: 'warning'
+      };
+    }
+
+    // AWS-specific errors
+    if (lowerError.includes('expired')) {
+      return {
+        message: '⏰ Your AWS credentials have expired. Please generate new keys in AWS Console.',
+        type: 'error'
+      };
+    }
+
+    if (lowerError.includes('permission') || lowerError.includes('denied') || lowerError.includes('accessdenied')) {
+      return {
+        message: '🚫 Access denied. Your IAM user may lack required permissions.',
+        type: 'error'
+      };
+    }
+
+    if (lowerError.includes('throttl')) {
+      return {
+        message: '⚡ Too many requests. Please wait a moment and try again.',
+        type: 'warning'
+      };
+    }
+
+    // Default error
+    return {
+      message: `❌ ${errorText}`,
+      type: 'error'
+    };
+  };
+
   const validateForm = () => {
     const errors = {};
 
@@ -44,6 +178,16 @@ const Login = () => {
     }
 
     setValidationErrors(errors);
+
+    // Show toast for validation errors
+    if (Object.keys(errors).length > 0) {
+      const errorCount = Object.keys(errors).length;
+      showToast(
+          `⚠️ Please fix ${errorCount} validation ${errorCount === 1 ? 'error' : 'errors'} before submitting`,
+          'warning'
+      );
+    }
+
     return Object.keys(errors).length === 0;
   };
 
@@ -62,14 +206,18 @@ const Login = () => {
       }));
     }
 
-    // Clear auth error
+    // Clear auth error and toast
     if (error) {
       clearError();
+    }
+    if (toast) {
+      hideToast();
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    hideToast(); // Clear any existing toast
 
     if (!validateForm()) {
       return;
@@ -79,11 +227,32 @@ const Login = () => {
 
     try {
       const result = await login(formData);
-      if (!result.success) {
-        // Error is handled by AuthContext
+
+      if (result.success) {
+        showToast(
+            result.is_new_account
+                ? '🎉 Welcome! Your account has been created successfully.'
+                : '✅ Login successful! Redirecting to dashboard...',
+            'success'
+        );
+      } else {
+        // --- PHẦN BỔ SUNG QUAN TRỌNG ---
+        // Xử lý khi API trả về success: false
+        // Lấy thông báo lỗi từ result trả về
+        const errorMsg = result.error || 'Login failed';
+
+        // Format lỗi cho đẹp bằng helper có sẵn
+        const { message, type } = getErrorMessage(errorMsg);
+
+        // Hiển thị Toast thông báo lỗi
+        showToast(message, type);
+        // -------------------------------
       }
+
     } catch (err) {
+      // Catch này chỉ chạy nếu có lỗi code (runtime error) hoặc lỗi mạng nghiêm trọng mà authApi không bắt được
       console.error('Login error:', err);
+      showToast('❌ An unexpected error occurred. Please try again.', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -120,6 +289,15 @@ const Login = () => {
         {/* Cosmic Hero Background */}
         <div className="hero absolute inset-0 -z-10"></div>
 
+        {/* Toast Notification */}
+        {toast && (
+            <Toast
+                message={toast.message}
+                type={toast.type}
+                onClose={hideToast}
+            />
+        )}
+
         <div className="max-w-md w-full space-y-8 relative z-10 animate-fade-in">
           {/* Cosmic Header */}
           <div className="text-center">
@@ -153,20 +331,30 @@ const Login = () => {
               <p className="text-cosmic-txt-2">Enter your AWS credentials to continue</p>
             </div>
             <form className="space-y-6" onSubmit={handleSubmit}>
-              {/* Cosmic Error Display */}
+              {/* Inline Error Display */}
               {error && (
                   <div className="bg-red-900/20 border border-red-800/50 rounded-xl p-4 animate-scale-in backdrop-blur-sm">
                     <div className="flex items-start">
                       <div className="flex-shrink-0">
-                        <AlertCircle className="h-5 w-5 text-red-400" />
+                        <XCircle className="h-5 w-5 text-red-400" />
                       </div>
-                      <div className="ml-3">
+                      <div className="ml-3 flex-1">
                         <h3 className="text-sm font-semibold text-red-300 mb-1">
                           Authentication Failed
                         </h3>
                         <p className="text-sm text-red-400 leading-relaxed">
                           {error}
                         </p>
+                        {error.toLowerCase().includes('invalid aws credentials') && (
+                            <div className="mt-3 text-xs text-red-300/80 space-y-1">
+                              <p>💡 Common causes:</p>
+                              <ul className="list-disc list-inside ml-2 space-y-0.5">
+                                <li>Incorrect Access Key or Secret Key</li>
+                                <li>Credentials have been rotated or revoked</li>
+                                <li>Copy/paste included extra spaces</li>
+                              </ul>
+                            </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -192,12 +380,17 @@ const Login = () => {
                       className={`appearance-none relative block w-full px-4 py-3 border ${
                           validationErrors.aws_access_key
                               ? 'border-red-600 bg-red-900/20'
-                              : 'border-cosmic-border bg-cosmic-card focus:border-blue-500'
+                              : error
+                                  ? 'border-red-600/50 bg-red-900/10'
+                                  : 'border-cosmic-border bg-cosmic-card focus:border-blue-500'
                       } placeholder-cosmic-muted text-cosmic-txt-1 rounded-xl focus-ring backdrop-blur-sm transition-all duration-300 text-sm font-medium`}
                       placeholder="AKIAIOSFODNN7EXAMPLE"
                   />
                   {validationErrors.aws_access_key && (
-                      <p className="mt-2 text-sm text-red-400 font-medium">{validationErrors.aws_access_key}</p>
+                      <p className="mt-2 text-sm text-red-400 font-medium flex items-center">
+                        <AlertCircle size={14} className="mr-1" />
+                        {validationErrors.aws_access_key}
+                      </p>
                   )}
                 </div>
               </div>
@@ -222,7 +415,9 @@ const Login = () => {
                       className={`appearance-none relative block w-full px-4 py-3 pr-12 border ${
                           validationErrors.aws_secret_key
                               ? 'border-red-600 bg-red-900/20'
-                              : 'border-cosmic-border bg-cosmic-card focus:border-blue-500'
+                              : error
+                                  ? 'border-red-600/50 bg-red-900/10'
+                                  : 'border-cosmic-border bg-cosmic-card focus:border-blue-500'
                       } placeholder-cosmic-muted text-cosmic-txt-1 rounded-xl focus-ring backdrop-blur-sm transition-all duration-300 text-sm font-medium`}
                       placeholder="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
                   />
@@ -238,7 +433,10 @@ const Login = () => {
                     )}
                   </button>
                   {validationErrors.aws_secret_key && (
-                      <p className="mt-2 text-sm text-red-400 font-medium">{validationErrors.aws_secret_key}</p>
+                      <p className="mt-2 text-sm text-red-400 font-medium flex items-center">
+                        <AlertCircle size={14} className="mr-1" />
+                        {validationErrors.aws_secret_key}
+                      </p>
                   )}
                 </div>
               </div>
@@ -263,7 +461,9 @@ const Login = () => {
                 <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="btn btn-primary w-full py-3 px-6 text-base font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                    className={`btn btn-primary w-full py-3 px-6 text-base font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 ${
+                        error ? 'animate-pulse-once' : ''
+                    }`}
                 >
                   <div className="relative flex items-center justify-center">
                     {isSubmitting && (
@@ -272,7 +472,7 @@ const Login = () => {
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
                     )}
-                    {isSubmitting ? 'Authenticating...' : 'Sign In to Dashboard'}
+                    {isSubmitting ? 'Verifying Credentials...' : 'Sign In to Dashboard'}
                   </div>
                 </button>
               </div>
@@ -283,19 +483,19 @@ const Login = () => {
           <div className="text-center">
             <div className="inline-flex items-center space-x-2 text-sm text-cosmic-txt-2 bg-cosmic-card px-6 py-3 rounded-full border border-cosmic-border backdrop-blur-sm">
               <span>Need help?</span>
-              <a
-                  href="https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-400 hover:text-blue-300 transition-colors font-medium underline decoration-blue-400/50 hover:decoration-blue-400"
+            <a
+              href="https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:text-blue-300 transition-colors font-medium underline decoration-blue-400/50 hover:decoration-blue-400"
               >
-                AWS IAM documentation
-              </a>
-            </div>
+              AWS IAM documentation
+            </a>
           </div>
         </div>
       </div>
-  );
+</div>
+);
 };
 
 export default Login;

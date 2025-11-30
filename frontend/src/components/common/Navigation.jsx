@@ -1,14 +1,16 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, BarChart3, Settings, Activity } from 'lucide-react';
+import { Home, BarChart3, Settings, Shield, Database, DollarSign } from 'lucide-react';
 
 const Navigation = () => {
   const location = useLocation();
-  
+
   const navItems = [
     { path: '/', label: 'Home', icon: Home },
     { path: '/dashboard', label: 'Dashboard', icon: BarChart3 },
-    { path: '/settings', label: 'Settings', icon: Settings }
+    { path: '/architecture', label: 'Architecture', icon: Shield },
+    { path: '/s3', label: 'S3 Buckets', icon: Database },
+    { path: '/costs', label: 'Cost Explorer', icon: DollarSign }
   ];
 
   const isActive = (path) => {
@@ -18,7 +20,7 @@ const Navigation = () => {
   return (
     <nav className="mx-6 mb-6">
       <div className="navbar">
-        <div className="flex space-x-2">
+      <div className="flex space-x-2">
           {navItems.map(({ path, label, icon: Icon }) => (
             <Link
               key={path}

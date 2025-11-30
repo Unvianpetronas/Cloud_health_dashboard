@@ -5,7 +5,7 @@ import os
 from cryptography.fernet import Fernet
 
 
-environment = os.getenv("ENVIRONMENT", "production")
+environment = os.getenv("ENVIRONMENT", "production") # if wat to change to development environment change this to development
 env_file = f".env.{environment}"
 if os.path.exists(env_file):
     load_dotenv(env_file)
@@ -42,14 +42,13 @@ class BaseConfig(BaseSettings):
 
     # SES
     SES_SENDER_EMAIL: str = "noreply@cloudhealthdashboard.xyz"
-    FRONTEND_URL: str = "https://cloudhealthdashboard.xyz"
     EMAIL_VERIFICATION_EXPIRE_HOURS: int = 24
 
     # Cache
     REDIS_URL: str = "redis://localhost:6379/0"
 
     #Secrets Manager
-    USE_SECRETS_MANAGER: bool = True
+    USE_SECRETS_MANAGER: bool = True  # Enabled with async support - no event loop blocking
 
     #Security Monitoring
     ENABLE_RATE_LIMITING: bool = True
@@ -88,6 +87,7 @@ class DevelopmentConfig(BaseConfig):
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5173"
     ]
+    FRONTEND_URL: str = "http://localhost:3000"
 
     # Auto-generate secure keys for development
     @property
@@ -117,6 +117,8 @@ class ProductionConfig(BaseConfig):
         "http://www.cloudhealthdashboard.xyz"
     ] # Must be set via environment
 
+    FRONTEND_URL: str = "https://cloudhealthdashboard.xyz"
+
     # Production requires real secrets from environm0ent
     JWT_SECRET_KEY: str
     ENCRYPTION_KEY: str
@@ -127,7 +129,7 @@ class ProductionConfig(BaseConfig):
 
 
 def get_settings() -> BaseConfig:
-    env = os.getenv("ENVIRONMENT", "development").lower()
+    env = os.getenv("ENVIRONMENT", "production").lower() # Change this to development to enable debug
 
     if env == "production":
         return ProductionConfig()
@@ -148,12 +150,12 @@ def validate_settings(settings: BaseConfig):
             Fernet(settings.ENCRYPTION_KEY.encode())
         except Exception:
             errors.append("ENCRYPTION_KEY is not a valid Fernet key")
-#
-#    if settings.ENVIRONMENT == "production":
- #       if settings.DEBUG:
-  #          errors.append("DEBUG must be False in production")
-   #     if not settings.CORS_ORIGINS:
-    #        errors.append("CORS_ORIGINS must be set in production")
+
+    if settings.ENVIRONMENT == "production":
+         if settings.DEBUG:
+             errors.append("DEBUG must be False in production")
+         if not settings.CORS_ORIGINS:
+             errors.append("CORS_ORIGINS must be set in production")
 
     if errors:
         raise ValueError(f"Configuration errors: {', '.join(errors)}")

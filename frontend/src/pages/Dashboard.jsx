@@ -1,14 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import useDashboardData from '../hooks/useDashboardData';
 import {
-    LineChart, Line, AreaChart, Area, BarChart, Bar,
-    PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid,
-    Tooltip, ResponsiveContainer, Legend
-} from 'recharts';
-import {
-    Activity, AlertTriangle, CheckCircle, Cloud, DollarSign,
-    Monitor, RefreshCw, Server, Shield, Zap, TrendingUp,
-    ChevronDown, ChevronUp
+    AlertTriangle, DollarSign,
+    RefreshCw, Server, Shield, Zap,
 } from 'lucide-react';
 
 import Header from '../components/common/Header';
@@ -18,13 +12,104 @@ import Loading from '../components/common/Loading';
 import EC2InstancesTable from '../components/dashboard/EC2InstancesTable';
 import GuardDutyFindingsTable from '../components/dashboard/GuardDutyFindingsTable';
 
+// LocalStorage keys (same as Settings page)
+const STORAGE_KEYS = {
+    AUTO_REFRESH: 'dashboard_autoRefresh',
+    REFRESH_INTERVAL: 'dashboard_refreshInterval',
+    DEFAULT_TIME_RANGE: 'dashboard_defaultTimeRange'
+};
+
+// Helper to format interval for display
+const formatInterval = (seconds) => {
+    if (seconds < 60) return `${seconds} seconds`;
+    if (seconds === 60) return '1 minute';
+    return `${seconds / 60} minutes`;
+};
+
 const AWSCloudHealthDashboard = () => {
-    const [selectedTimeRange, setSelectedTimeRange] = useState('24h');
+    // Load default time range from localStorage
+    const getDefaultTimeRange = () => {
+        return localStorage.getItem(STORAGE_KEYS.DEFAULT_TIME_RANGE) || '24h';
+    };
+
+    const [selectedTimeRange, setSelectedTimeRange] = useState(getDefaultTimeRange);
     const [alertsExpanded, setAlertsExpanded] = useState(true);
-    const [performanceExpanded, setPerformanceExpanded] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
+    // Auto-refresh settings state
+    const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+    const [refreshInterval, setRefreshInterval] = useState(300); // seconds
+    const [nextRefreshIn, setNextRefreshIn] = useState(null);
+
     const { data, loading, error, lastUpdated, refresh } = useDashboardData(selectedTimeRange);
+
+    // Load auto-refresh settings from localStorage
+    useEffect(() => {
+        const loadSettings = () => {
+            const autoRefresh = localStorage.getItem(STORAGE_KEYS.AUTO_REFRESH);
+            const interval = localStorage.getItem(STORAGE_KEYS.REFRESH_INTERVAL);
+
+            setAutoRefreshEnabled(autoRefresh !== null ? autoRefresh === 'true' : true);
+            setRefreshInterval(interval !== null ? parseInt(interval) : 300);
+        };
+
+        loadSettings();
+
+        // Listen for storage changes (if user changes settings in another tab)
+        const handleStorageChange = (e) => {
+            if (Object.values(STORAGE_KEYS).includes(e.key)) {
+                loadSettings();
+            }
+        };
+
+        window.addEventListener('storage', handleStorageChange);
+        return () => window.removeEventListener('storage', handleStorageChange);
+    }, []);
+
+    // Handle manual refresh
+    const handleRefresh = useCallback(async () => {
+        setRefreshing(true);
+        await refresh();
+        setRefreshing(false);
+        setNextRefreshIn(refreshInterval); // Reset countdown after manual refresh
+    }, [refresh, refreshInterval]);
+
+    // Auto-refresh effect
+    useEffect(() => {
+        if (!autoRefreshEnabled) {
+            setNextRefreshIn(null);
+            return;
+        }
+
+        // Initialize countdown
+        setNextRefreshIn(refreshInterval);
+
+        // Countdown timer (updates every second)
+        const countdownTimer = setInterval(() => {
+            setNextRefreshIn(prev => {
+                if (prev === null || prev <= 1) {
+                    return refreshInterval;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        // Actual refresh timer
+        const refreshTimer = setInterval(() => {
+            refresh();
+        }, refreshInterval * 1000);
+
+        return () => {
+            clearInterval(countdownTimer);
+            clearInterval(refreshTimer);
+        };
+    }, [autoRefreshEnabled, refreshInterval, refresh]);
+
+    // Update time range in localStorage when changed
+    const handleTimeRangeChange = (newRange) => {
+        setSelectedTimeRange(newRange);
+        localStorage.setItem(STORAGE_KEYS.DEFAULT_TIME_RANGE, newRange);
+    };
 
     // ✅ Custom label renderer for pie chart
     const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }) => {
@@ -52,12 +137,6 @@ const AWSCloudHealthDashboard = () => {
         );
     };
 
-    const handleRefresh = async () => {
-        setRefreshing(true);
-        await refresh();
-        setRefreshing(false);
-    };
-
     // Loading state
     if (loading && !data.ec2Summary) {
         return (
@@ -67,7 +146,7 @@ const AWSCloudHealthDashboard = () => {
                     onRefresh={handleRefresh}
                     refreshing={refreshing}
                     selectedTimeRange={selectedTimeRange}
-                    onTimeRangeChange={setSelectedTimeRange}
+                    onTimeRangeChange={handleTimeRangeChange}
                 />
                 <main className="container mx-auto px-6 flex items-center justify-center min-h-96">
                     <Card className="p-8 text-center animate-fade-in">
@@ -90,7 +169,7 @@ const AWSCloudHealthDashboard = () => {
                     onRefresh={handleRefresh}
                     refreshing={refreshing}
                     selectedTimeRange={selectedTimeRange}
-                    onTimeRangeChange={setSelectedTimeRange}
+                    onTimeRangeChange={handleTimeRangeChange}
                 />
                 <main className="container mx-auto px-6 flex items-center justify-center min-h-96">
                     <Card className="p-8 text-center max-w-md animate-scale-in">
@@ -109,19 +188,15 @@ const AWSCloudHealthDashboard = () => {
         );
     }
 
-    // 🆕 UPDATED: Added GuardDuty data destructuring
     const {
         ec2Summary,
-        ec2Instances,  // NEW: All EC2 instances for table
+        ec2Instances,
         ec2Cost,
         guarddutyStatus,
         guarddutyCritical,
         guarddutySummary,
-        allFindings,  // NEW: All GuardDuty findings for table
-        performance,
-        serviceHealth,
-        alerts,
-        serviceStatus
+        allFindings,
+        serviceHealth
     } = data;
 
     // Calculate EC2 metrics
@@ -130,13 +205,12 @@ const AWSCloudHealthDashboard = () => {
     const totalCost = ec2Cost?.total_estimated_cost || 0;
     const regionsActive = ec2Summary?.regions_with_instances || 0;
 
-    // 🆕 NEW: GuardDuty metrics calculations
+    // GuardDuty metrics calculations
     const criticalFindings = guarddutyCritical?.count || 0;
     const totalFindings = guarddutySummary?.total_findings || 0;
     const gdEnabled = guarddutyStatus?.enabled || false;
     const highSeverityCount = guarddutySummary?.by_severity?.HIGH || 0;
 
-    // 🆕 UPDATED: Added GuardDuty metrics cards
     const metricsData = [
         {
             title: 'EC2 Monthly Cost',
@@ -156,7 +230,6 @@ const AWSCloudHealthDashboard = () => {
             iconColor: '#10b981',
             iconBgColor: '#d1fae5'
         },
-        // 🆕 NEW: Critical Security Findings
         {
             title: 'Critical Findings',
             value: criticalFindings,
@@ -166,7 +239,6 @@ const AWSCloudHealthDashboard = () => {
             iconColor: '#ef4444',
             iconBgColor: '#fef2f2'
         },
-        // 🆕 NEW: Total GuardDuty Findings
         {
             title: 'Security Findings',
             value: totalFindings,
@@ -187,50 +259,6 @@ const AWSCloudHealthDashboard = () => {
         }
     ];
 
-    // Helper functions for styling
-    const getSeverityColor = (severity) => {
-        switch (severity?.toLowerCase()) {
-            case 'critical': return '#ef4444';
-            case 'high': return '#f97316';
-            case 'warning': return '#f59e0b';
-            case 'medium': return '#eab308';
-            case 'low': return '#3b82f6';
-            case 'info': return '#06b6d4';
-            default: return '#6b7280';
-        }
-    };
-
-    const getSeverityBg = (severity) => {
-        switch (severity?.toLowerCase()) {
-            case 'critical': return 'rgba(239, 68, 68, 0.1)';
-            case 'high': return 'rgba(249, 115, 22, 0.1)';
-            case 'warning': return 'rgba(245, 158, 11, 0.1)';
-            case 'medium': return 'rgba(234, 179, 8, 0.1)';
-            case 'low': return 'rgba(59, 130, 246, 0.1)';
-            case 'info': return 'rgba(6, 182, 212, 0.1)';
-            default: return 'rgba(107, 114, 128, 0.1)';
-        }
-    };
-
-    const getStatusColor = (status) => {
-        switch (status?.toLowerCase()) {
-            case 'healthy': return '#10b981';
-            case 'warning': return '#f59e0b';
-            case 'critical': return '#ef4444';
-            case 'unknown': return '#6b7280';
-            default: return '#6b7280';
-        }
-    };
-
-    const getStatusIcon = (status) => {
-        switch (status?.toLowerCase()) {
-            case 'healthy': return <CheckCircle size={20} />;
-            case 'warning': return <AlertTriangle size={20} />;
-            case 'critical': return <AlertTriangle size={20} />;
-            default: return <Monitor size={20} />;
-        }
-    };
-
     return (
         <div className="min-h-screen">
             <Header
@@ -238,10 +266,36 @@ const AWSCloudHealthDashboard = () => {
                 onRefresh={handleRefresh}
                 refreshing={refreshing}
                 selectedTimeRange={selectedTimeRange}
-                onTimeRangeChange={setSelectedTimeRange}
+                onTimeRangeChange={handleTimeRangeChange}
             />
 
             <main className="container mx-auto px-6 py-8 space-y-6">
+                {/* Status Banner - Updated with dynamic auto-refresh info */}
+                <div className="mb-6 animate-fade-in">
+                    <div className="flex items-center justify-center">
+                        <div className="inline-flex items-center space-x-3 text-sm text-cosmic-secondary bg-cosmic-card px-6 py-3 rounded-full border border-cosmic-border backdrop-blur-sm shadow-lg">
+                            <div className={`w-2 h-2 rounded-full ${autoRefreshEnabled ? 'bg-green-400 animate-pulse' : 'bg-gray-400'}`}></div>
+                            <span>Last updated: {lastUpdated ? lastUpdated.toLocaleTimeString() : 'Never'}</span>
+                            <span className="text-cosmic-muted">•</span>
+                            {autoRefreshEnabled ? (
+                                <>
+                                    <span>Auto-refresh: {formatInterval(refreshInterval)}</span>
+                                    {nextRefreshIn !== null && (
+                                        <>
+                                            <span className="text-cosmic-muted">•</span>
+                                            <span className="text-blue-400">
+                                                Next: {nextRefreshIn}s
+                                            </span>
+                                        </>
+                                    )}
+                                </>
+                            ) : (
+                                <span className="text-yellow-400">Auto-refresh: Off</span>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
                 {/* Top Section: Metrics Cards */}
                 <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
                     {metricsData.map((metric, index) => (
@@ -254,7 +308,7 @@ const AWSCloudHealthDashboard = () => {
                     ))}
                 </section>
 
-                {/* 🆕 NEW: GuardDuty Security Overview Section */}
+                {/* GuardDuty Security Overview Section */}
                 <section className="mb-6">
                     <Card className="p-6 animate-slide-up">
                         <h3 className="text-lg font-semibold text-cosmic-txt-1 mb-4 flex items-center">
@@ -271,7 +325,6 @@ const AWSCloudHealthDashboard = () => {
                         ) : (
                             <>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                                    {/* Status Card */}
                                     <div className="p-4 bg-cosmic-bg-2 rounded-xl border border-cosmic-border">
                                         <div className="flex items-center justify-between mb-2">
                                             <span className="text-sm text-cosmic-txt-2">Status</span>
@@ -282,7 +335,6 @@ const AWSCloudHealthDashboard = () => {
                                         </p>
                                     </div>
 
-                                    {/* Critical Findings Card */}
                                     <div className="p-4 bg-cosmic-bg-2 rounded-xl border border-red-500/30">
                                         <div className="flex items-center justify-between mb-2">
                                             <span className="text-sm text-cosmic-txt-2">Critical</span>
@@ -294,7 +346,6 @@ const AWSCloudHealthDashboard = () => {
                                         <p className="text-xs text-cosmic-txt-2 mt-1">Findings</p>
                                     </div>
 
-                                    {/* Total Findings Card */}
                                     <div className="p-4 bg-cosmic-bg-2 rounded-xl border border-cosmic-border">
                                         <div className="flex items-center justify-between mb-2">
                                             <span className="text-sm text-cosmic-txt-2">Total</span>
@@ -307,7 +358,6 @@ const AWSCloudHealthDashboard = () => {
                                     </div>
                                 </div>
 
-                                {/* Findings by Severity */}
                                 {guarddutySummary?.by_severity && (
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                         <div className="text-center p-3 bg-red-500/10 rounded-lg border border-red-500/30">
@@ -341,7 +391,7 @@ const AWSCloudHealthDashboard = () => {
                     </Card>
                 </section>
 
-                {/* 🆕 NEW: EC2 Instances Table Section */}
+                {/* EC2 Instances Table Section */}
                 <section className="animate-slide-up" style={{ animationDelay: '0.2s' }}>
                     <EC2InstancesTable
                         instances={ec2Instances || []}
@@ -349,226 +399,13 @@ const AWSCloudHealthDashboard = () => {
                     />
                 </section>
 
-                {/* 🆕 NEW: GuardDuty Findings Table Section */}
+                {/* GuardDuty Findings Table Section */}
                 <section className="animate-slide-up" style={{ animationDelay: '0.3s' }}>
                     <GuardDutyFindingsTable
                         findings={allFindings || []}
                         loading={loading}
                     />
                 </section>
-
-                {/* Middle Section: Service Health & Performance */}
-                <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Service Health Pie Chart */}
-                    <Card className="p-6 animate-slide-up">
-                        <h3 className="text-lg font-semibold text-cosmic-txt-1 mb-4 flex items-center">
-                            <Activity size={20} className="mr-2 text-green-400" />
-                            Service Health Overview
-                        </h3>
-                        <ResponsiveContainer width="100%" height={300}>
-                            <PieChart>
-                                <Pie
-                                    data={serviceHealth}
-                                    cx="50%"
-                                    cy="50%"
-                                    labelLine={false}
-                                    label={renderCustomLabel}
-                                    outerRadius={80}
-                                    fill="#8884d8"
-                                    dataKey="value"
-                                >
-                                    {serviceHealth?.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.color} />
-                                    ))}
-                                </Pie>
-                                <Tooltip
-                                    contentStyle={{
-                                        backgroundColor: 'rgba(26, 32, 53, 0.95)',
-                                        border: '1px solid rgba(110, 168, 255, 0.3)',
-                                        borderRadius: '0.5rem',
-                                        color: '#e6e9f5'
-                                    }}
-                                />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </Card>
-
-                    {/* Performance Metrics */}
-                    <Card className="p-0 animate-slide-up" style={{ animationDelay: '0.1s' }}>
-                        <div
-                            className="p-6 border-b border-cosmic-border flex justify-between items-center cursor-pointer"
-                            onClick={() => setPerformanceExpanded(!performanceExpanded)}
-                        >
-                            <h3 className="text-lg font-semibold text-cosmic-txt-1 flex items-center">
-                                <TrendingUp size={20} className="mr-2 text-blue-400" />
-                                Performance Metrics
-                            </h3>
-                            {performanceExpanded ?
-                                <ChevronUp size={20} className="text-cosmic-txt-2" /> :
-                                <ChevronDown size={20} className="text-cosmic-txt-2" />
-                            }
-                        </div>
-                        {performanceExpanded && (
-                            <ResponsiveContainer width="100%" height={300} className="p-4">
-                                <LineChart data={performance} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(110, 168, 255, 0.1)" />
-                                    <XAxis
-                                        dataKey="time"
-                                        stroke="#a5b4fc"
-                                        style={{ fontSize: '12px' }}
-                                    />
-                                    <YAxis
-                                        stroke="#a5b4fc"
-                                        style={{ fontSize: '12px' }}
-                                    />
-                                    <Tooltip
-                                        contentStyle={{
-                                            backgroundColor: 'rgba(26, 32, 53, 0.95)',
-                                            border: '1px solid rgba(110, 168, 255, 0.3)',
-                                            borderRadius: '0.75rem',
-                                            color: '#e6e9f5',
-                                            backdropFilter: 'blur(12px)'
-                                        }}
-                                    />
-                                    <Legend />
-                                    <Line type="monotone" dataKey="cpu" stroke="#ef4444" strokeWidth={2} name="CPU %" dot={{ r: 4 }} />
-                                    <Line type="monotone" dataKey="memory" stroke="#3b82f6" strokeWidth={2} name="Memory %" dot={{ r: 4 }} />
-                                    <Line type="monotone" dataKey="network" stroke="#10b981" strokeWidth={2} name="Network %" dot={{ r: 4 }} />
-                                    <Line type="monotone" dataKey="storage" stroke="#f59e0b" strokeWidth={2} name="Storage %" dot={{ r: 4 }} />
-                                </LineChart>
-                            </ResponsiveContainer>
-                        )}
-                    </Card>
-                </section>
-
-                {/* Bottom Section: Alerts & Service Status */}
-                <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Alerts Panel */}
-                    <Card className="p-0 animate-slide-up">
-                        <div
-                            className="p-6 border-b border-cosmic-border flex justify-between items-center cursor-pointer"
-                            onClick={() => setAlertsExpanded(!alertsExpanded)}
-                        >
-                            <h3 className="text-lg font-semibold text-cosmic-txt-1 flex items-center">
-                                <AlertTriangle size={20} className="mr-2 text-red-400" />
-                                Recent Alerts
-                            </h3>
-                            {alertsExpanded ?
-                                <ChevronUp size={20} className="text-cosmic-txt-2" /> :
-                                <ChevronDown size={20} className="text-cosmic-txt-2" />
-                            }
-                        </div>
-                        {alertsExpanded && (
-                            <div className="p-4 space-y-3 max-h-96 overflow-y-auto">
-                                {alerts?.length === 0 ? (
-                                    <div className="text-center py-8 text-cosmic-txt-2">
-                                        <CheckCircle size={48} className="mx-auto mb-2 opacity-50 text-green-400" />
-                                        <p>No alerts at this time</p>
-                                    </div>
-                                ) : (
-                                    alerts?.map((alert) => (
-                                        <div
-                                            key={alert.id}
-                                            className="p-4 rounded-xl border transition-all duration-200 hover:shadow-cosmic-glow"
-                                            style={{
-                                                borderColor: getSeverityColor(alert.severity),
-                                                backgroundColor: getSeverityBg(alert.severity),
-                                                backdropFilter: 'blur(8px)'
-                                            }}
-                                        >
-                                            <div className="flex items-start space-x-3">
-                                                <AlertTriangle
-                                                    size={16}
-                                                    style={{ color: getSeverityColor(alert.severity) }}
-                                                    className="mt-0.5 flex-shrink-0"
-                                                />
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center space-x-2 mb-2">
-                                                        <span
-                                                            className="text-xs font-semibold uppercase px-2 py-1 rounded"
-                                                            style={{
-                                                                color: getSeverityColor(alert.severity),
-                                                                backgroundColor: 'rgba(15, 20, 40, 0.5)'
-                                                            }}
-                                                        >
-                                                            {alert.severity}
-                                                        </span>
-                                                        <span className="text-sm text-cosmic-txt-2">
-                                                            {alert.service} • {alert.region}
-                                                        </span>
-                                                    </div>
-                                                    <p className="text-sm text-cosmic-txt-1 mb-2 leading-relaxed">
-                                                        {alert.message}
-                                                    </p>
-                                                    <p className="text-xs text-cosmic-muted">
-                                                        {alert.timestamp}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        )}
-                    </Card>
-
-                    {/* Service Status List */}
-                    <Card className="p-6 animate-slide-up" style={{ animationDelay: '0.1s' }}>
-                        <h3 className="text-lg font-semibold text-cosmic-txt-1 mb-4 flex items-center">
-                            <Shield size={20} className="mr-2 text-blue-400" />
-                            Service Status
-                        </h3>
-                        <div className="space-y-3">
-                            {serviceStatus?.length === 0 ? (
-                                <div className="text-center py-8 text-cosmic-txt-2">
-                                    <Monitor size={48} className="mx-auto mb-2 opacity-50" />
-                                    <p>No services to display</p>
-                                </div>
-                            ) : (
-                                serviceStatus?.map((service, index) => (
-                                    <div
-                                        key={index}
-                                        className="flex items-center justify-between p-4 bg-cosmic-bg-2 rounded-xl border border-cosmic-border hover:border-blue-500/50 transition-all duration-200"
-                                    >
-                                        <div className="flex items-center space-x-3">
-                                            <div style={{ color: getStatusColor(service.status) }}>
-                                                {getStatusIcon(service.status)}
-                                            </div>
-                                            <div>
-                                                <p className="font-medium text-cosmic-txt-1">{service.name}</p>
-                                                <p className="text-sm text-cosmic-txt-2">{service.region}</p>
-                                            </div>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="font-medium text-cosmic-txt-1 mb-1">
-                                                {service.instances} instances
-                                            </p>
-                                            <span
-                                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize"
-                                                style={{
-                                                    color: getStatusColor(service.status),
-                                                    backgroundColor: `${getStatusColor(service.status)}20`
-                                                }}
-                                            >
-                                                {service.status}
-                                            </span>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    </Card>
-                </section>
-
-                {/* Footer Stats */}
-                <div className="mt-8 text-center">
-                    <div className="inline-flex items-center space-x-2 text-sm text-cosmic-txt-2 bg-cosmic-card px-6 py-3 rounded-full border border-cosmic-border backdrop-blur-sm">
-                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                        <span>Last updated: {lastUpdated ? lastUpdated.toLocaleTimeString() : 'Never'}</span>
-                        <span>•</span>
-                        <span>Auto-refresh: Every 5 minutes</span>
-                    </div>
-                </div>
             </main>
         </div>
     );

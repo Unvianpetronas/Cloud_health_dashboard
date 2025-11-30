@@ -29,7 +29,7 @@ const Header = ({
 
   return (
       <div>
-        <header className="navbar mx-6 mt-4 mb-2">
+        <header className="navbar navbar--header mx-6 mt-4 mb-2">
           <div className="flex justify-between items-center">
             {/* Left: Logo and Title */}
             <div className="flex items-center space-x-4">
@@ -41,7 +41,7 @@ const Header = ({
                   {title}
                 </h1>
                 <div className="badge mt-1 animate-fade-in">
-                  ✨ Real-time Monitoring
+                  Real-time Monitoring
                 </div>
               </div>
             </div>
