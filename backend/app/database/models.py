@@ -3,9 +3,6 @@ from typing import Dict, Optional, List, Union
 from boto3.dynamodb.conditions import Key, Attr
 import uuid
 import logging
-
-from twisted.words.protocols.jabber.jstrports import client
-
 from app.database.dynamodb import DynamoDBConnection
 from app.config import settings
 from decimal import Decimal
