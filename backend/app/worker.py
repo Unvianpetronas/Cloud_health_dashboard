@@ -269,7 +269,7 @@ class CloudHealthWorker:
         try:
             logger.info(f"[{self.aws_account_id}] Collecting S3 metrics...")
 
-            s3_data = self.s3_scanner.scan_all_buckets()
+            s3_data = self.s3_scanner.list_all_buckets()
             timestamp = datetime.now()
 
             #Now includes client_id

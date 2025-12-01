@@ -23,16 +23,42 @@ class CostExplorerScanner(BaseAWSScanner):
     # --------- helpers ---------
 
     def _is_ce_not_enabled(self, error: ClientError) -> bool:
-        """Check nếu Cost Explorer chưa được enable trong account."""
+        """
+        Check nếu Cost Explorer chưa được enable trong account.
+        DataUnavailableException có thể có nhiều nguyên nhân:
+        - Cost Explorer chưa enable
+        - Account mới, chưa có data
+        - Đang trong quá trình ingest data (24-48 hours)
+        """
         code = error.response.get("Error", {}).get("Code", "")
-        return code == "SubscriptionRequiredException"
+        message = error.response.get("Error", {}).get("Message", "")
+
+        # Check error code
+        if code in ["SubscriptionRequiredException", "DataUnavailableException"]:
+            return True
+
+        # Check message content
+        if "not enabled" in message.lower() or "not ingested yet" in message.lower():
+            return True
+
+        return False
+
+    def _get_not_enabled_response(self, operation: str) -> Dict:
+        """Trả về response structure nhất quán khi Cost Explorer chưa enabled."""
+        return {
+            "enabled": False,
+            "message": "Cost Explorer is not enabled or data is not available yet. "
+                       "Please enable Cost Explorer in AWS Console and wait 24-48 hours for data ingestion.",
+            "operation": operation,
+            "recommendation": "To enable: AWS Console → Billing Dashboard → Cost Explorer → Enable Cost Explorer"
+        }
 
     # --------- main methods ---------
 
-    @BaseAWSScanner.with_retry()
     def get_total_cost(self, start_date: str, end_date: str, granularity: str = "MONTHLY") -> Dict:
         """
         Tổng chi phí trong khoảng thời gian.
+        Không dùng retry decorator để có thể handle gracefully.
         """
         try:
             response = self.client.get_cost_and_usage(
@@ -42,21 +68,17 @@ class CostExplorerScanner(BaseAWSScanner):
             )
             # đảm bảo luôn có key expected
             response.setdefault("ResultsByTime", [])
+            response["enabled"] = True
             return response
 
         except ClientError as e:
             if self._is_ce_not_enabled(e):
-                logger.warning("Cost Explorer is not enabled for this account (total cost).")
-                # giống style GuardDuty: trả về cấu trúc rỗng + message
-                return {
-                    "ResultsByTime": [],
-                    "message": "Cost Explorer is not enabled for this account."
-                }
+                logger.warning("Cost Explorer is not enabled or data unavailable (total cost).")
+                return self._get_not_enabled_response("get_total_cost")
 
             logger.error(f"Fail to get total cost: {e}")
             raise
 
-    @BaseAWSScanner.with_retry()
     def get_cost_by_service(self, start_date: str, end_date: str, granularity: str = "MONTHLY") -> Dict:
         """
         Chi phí theo từng service (DynamoDB, EC2, S3, CloudWatch, v.v...).
@@ -70,21 +92,17 @@ class CostExplorerScanner(BaseAWSScanner):
             )
             response.setdefault("ResultsByTime", [])
             response.setdefault("GroupDefinitions", [{"Type": "DIMENSION", "Key": "SERVICE"}])
+            response["enabled"] = True
             return response
 
         except ClientError as e:
             if self._is_ce_not_enabled(e):
-                logger.warning("Cost Explorer is not enabled for this account (by service).")
-                return {
-                    "ResultsByTime": [],
-                    "GroupDefinitions": [{"Type": "DIMENSION", "Key": "SERVICE"}],
-                    "message": "Cost Explorer is not enabled for this account."
-                }
+                logger.warning("Cost Explorer is not enabled or data unavailable (by service).")
+                return self._get_not_enabled_response("get_cost_by_service")
 
             logger.error(f"Fail to get cost by service: {e}")
             raise
 
-    @BaseAWSScanner.with_retry()
     def get_cost_by_account(self, start_date: str, end_date: str, granularity: str = "MONTHLY") -> Dict:
         """
         Chi phí theo từng AWS account.
@@ -98,24 +116,21 @@ class CostExplorerScanner(BaseAWSScanner):
             )
             response.setdefault("ResultsByTime", [])
             response.setdefault("GroupDefinitions", [{"Type": "DIMENSION", "Key": "LINKED_ACCOUNT"}])
+            response["enabled"] = True
             return response
 
         except ClientError as e:
             if self._is_ce_not_enabled(e):
-                logger.warning("Cost Explorer is not enabled for this account (by account).")
-                return {
-                    "ResultsByTime": [],
-                    "GroupDefinitions": [{"Type": "DIMENSION", "Key": "LINKED_ACCOUNT"}],
-                    "message": "Cost Explorer is not enabled for this account."
-                }
+                logger.warning("Cost Explorer is not enabled or data unavailable (by account).")
+                return self._get_not_enabled_response("get_cost_by_account")
 
             logger.error(f"Fail to get cost by account: {e}")
             raise
 
-    @BaseAWSScanner.with_retry()
     def get_cost_forecast(self, days_ahead: int = 30, metric: str = "UNBLENDED_COST") -> Dict:
         """
         Dự báo chi phí cho X ngày tới.
+        Requires at least 30 days of historical data.
         """
         try:
             start = datetime.now(UTC).date().isoformat()
@@ -127,20 +142,19 @@ class CostExplorerScanner(BaseAWSScanner):
                 Metric=metric
             )
             response.setdefault("ForecastResultsByTime", [])
+            response["enabled"] = True
             return response
 
         except ClientError as e:
             if self._is_ce_not_enabled(e):
-                logger.warning("Cost Explorer is not enabled for this account (forecast).")
-                return {
-                    "ForecastResultsByTime": [],
-                    "message": "Cost Explorer is not enabled for this account."
-                }
+                logger.warning("Cost Explorer is not enabled or insufficient data for forecast.")
+                response = self._get_not_enabled_response("get_cost_forecast")
+                response["message"] += " (Forecast requires at least 30 days of historical data)"
+                return response
 
             logger.error(f"Fail to get cost forecast: {e}")
             raise
 
-    @BaseAWSScanner.with_retry()
     def get_rightsizing_recommendations(self, service: str = "AmazonEC2") -> Dict:
         """
         Gợi ý rightsizing cho service (mặc định: EC2).
@@ -150,15 +164,13 @@ class CostExplorerScanner(BaseAWSScanner):
                 Service=service
             )
             response.setdefault("RightsizingRecommendations", [])
+            response["enabled"] = True
             return response
 
         except ClientError as e:
             if self._is_ce_not_enabled(e):
-                logger.warning("Cost Explorer is not enabled for this account (rightsizing).")
-                return {
-                    "RightsizingRecommendations": [],
-                    "message": "Cost Explorer is not enabled for this account."
-                }
+                logger.warning("Cost Explorer is not enabled or data unavailable (rightsizing).")
+                return self._get_not_enabled_response("get_rightsizing_recommendations")
 
             logger.error(f"Fail to get rightsizing recommendations: {e}")
             raise
