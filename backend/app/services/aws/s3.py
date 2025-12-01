@@ -2,7 +2,6 @@ from typing import Dict, List
 from botocore.exceptions import ClientError
 from .client import AWSClientProvider
 import logging
-from datetime import datetime, timedelta, UTC
 from .base_scanner import BaseAWSScanner
 logger = logging.getLogger(__name__)
 
@@ -49,77 +48,46 @@ class S3Scanner(BaseAWSScanner):
     @BaseAWSScanner.with_retry()
     def get_bucket_storage_metrics(self, bucket_name: str, region: str) -> Dict:
         """
-        Get storage size and object count metrics from CloudWatch.
+        Get REAL-TIME storage size and object count by scanning S3 directly.
+        Returns size in Bytes, MB, and GB.
         """
         try:
-            cloudwatch = self.client_provider.get_client("cloudwatch", region_name=region)
-            end = datetime.now(UTC)
-            start = end - timedelta(days=1)
+            # We use the region specific client if possible, though S3 is global
+            s3_client = self.client_provider.get_client("s3", region_name=region)
 
-            metrics = {}
+            total_size_bytes = 0
+            object_count = 0
 
-            # StandardStorage size (bytes)
-            size_resp = cloudwatch.get_metric_statistics(
-                Namespace="AWS/S3",
-                MetricName="BucketSizeBytes",
-                Dimensions=[
-                    {"Name": "BucketName", "Value": bucket_name},
-                    {"Name": "StorageType", "Value": "StandardStorage"}
-                ],
-                StartTime=start,
-                EndTime=end,
-                Period=86400,  # daily
-                Statistics=["Average"],
-            )
-            datapoints = size_resp.get("Datapoints", [])
-            if datapoints:
-                metrics["StandardStorageBytes"] = datapoints[-1]["Average"]
+            # Use Paginator to handle buckets with >1000 files
+            paginator = s3_client.get_paginator('list_objects_v2')
 
-            # NumberOfObjects
-            obj_resp = cloudwatch.get_metric_statistics(
-                Namespace="AWS/S3",
-                MetricName="NumberOfObjects",
-                Dimensions=[
-                    {"Name": "BucketName", "Value": bucket_name},
-                    {"Name": "StorageType", "Value": "AllStorageTypes"}
-                ],
-                StartTime=start,
-                EndTime=end,
-                Period=86400,
-                Statistics=["Average"],
-            )
-            datapoints = obj_resp.get("Datapoints", [])
-            if datapoints:
-                metrics["ObjectCount"] = datapoints[-1]["Average"]
+            print(paginator)
 
-            return metrics
+            try:
+                for page in paginator.paginate(Bucket=bucket_name):
+                    if 'Contents' in page:
+                        for obj in page['Contents']:
+                            total_size_bytes += obj['Size']
+                            object_count += 1
+            except ClientError as e:
+                logger.warning(f"Could not list objects in {bucket_name}: {e}")
+                return {}
 
-        except ClientError as e:
-            logger.error(f"Error getting metrics for bucket {bucket_name}: {e}")
+            # --- CONVERSION LOGIC ---
+            # Convert to GB (1024^3) and MB (1024^2)
+            size_gb = total_size_bytes / (1024 ** 3)
+            size_mb = total_size_bytes / (1024 ** 2)
+
+            return {
+                "StandardStorageBytes": total_size_bytes,
+                "size_mb": round(size_mb, 2),
+                "size_gb": round(size_gb, 4),
+                "ObjectCount": object_count
+            }
+
+        except Exception as e:
+            logger.error(f"Error calculating metrics for bucket {bucket_name}: {e}")
             return {}
-
-    @BaseAWSScanner.with_retry()
-    def scan_all_buckets(self) -> Dict:
-        """
-        Scan all buckets in account with storage metrics.
-        """
-        buckets = self.list_buckets()
-        results = []
-
-        for b in buckets:
-            storage = self.get_bucket_storage_metrics(b["bucket"], b["region"])
-            is_public = self._check_public_buckets(b["bucket"])
-            results.append({
-                "bucket": b["bucket"],
-                "region": b["region"],
-                "metrics": storage,
-                "security" : is_public
-            })
-
-        return {
-            "total_buckets": len(results),
-            "buckets": results
-        }
 
     def list_all_buckets(self) -> Dict:
         """

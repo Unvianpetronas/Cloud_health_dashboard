@@ -3,6 +3,7 @@ import useDashboardData from '../hooks/useDashboardData';
 import {
     AlertTriangle, DollarSign,
     RefreshCw, Server, Shield, Zap,
+    Gift, CheckCircle, Clock
 } from 'lucide-react';
 
 import Header from '../components/common/Header';
@@ -11,6 +12,70 @@ import MetricsCard from '../components/dashboard/MetricsCard';
 import Loading from '../components/common/Loading';
 import EC2InstancesTable from '../components/dashboard/EC2InstancesTable';
 import GuardDutyFindingsTable from '../components/dashboard/GuardDutyFindingsTable';
+import apiClient from '../services/api';
+
+// --- NEW COMPONENT: FREE TIER BANNER ---
+const FreeTierBanner = ({ data, loading }) => {
+    // Hide if loading, no data, or explicitly not active
+    if (loading || !data || !data.is_active || !data.offers || data.offers.length === 0) {
+        return null;
+    }
+
+    return (
+        <div className="mb-6 rounded-xl overflow-hidden border border-emerald-500/30 bg-gradient-to-r from-emerald-900/40 to-teal-900/40 backdrop-blur-sm animate-fade-in">
+            <div className="p-4 border-b border-emerald-500/30 flex justify-between items-center bg-emerald-900/20">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-emerald-500 rounded-lg shadow-lg shadow-emerald-500/20">
+                        <Gift className="text-white h-5 w-5" />
+                    </div>
+                    <div>
+                        <h2 className="text-base font-bold text-white">AWS Free Tier Status</h2>
+                        <p className="text-emerald-300 text-xs">Your account is currently using free tier benefits</p>
+                    </div>
+                </div>
+                <div className="px-3 py-1 bg-emerald-500/20 border border-emerald-500 text-emerald-300 rounded-full text-xs font-bold flex items-center gap-2">
+                    <CheckCircle size={14} /> Active
+                </div>
+            </div>
+
+            <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {data.offers.map((offer, index) => {
+                    let progressColor = "bg-emerald-500";
+                    if (offer.percent_used > 80) progressColor = "bg-yellow-500";
+                    if (offer.percent_used >= 100) progressColor = "bg-red-500";
+
+                    return (
+                        <div key={index} className="bg-gray-900/50 p-3 rounded-lg border border-gray-700 hover:border-emerald-500/50 transition-colors">
+                            <div className="flex justify-between items-start mb-2">
+                                <h3 className="text-sm font-bold text-white truncate pr-2" title={offer.service}>{offer.service}</h3>
+                                <span className="text-[10px] bg-gray-700 px-2 py-0.5 rounded text-gray-300 whitespace-nowrap">{offer.type}</span>
+                            </div>
+
+                            <div className="flex justify-between text-xs mb-1">
+                                <span className="text-gray-300">{offer.usage} / {offer.limit} {offer.unit}</span>
+                                <span className={offer.percent_used >= 100 ? "text-red-400 font-bold" : "text-emerald-400"}>
+                                    {offer.percent_used}%
+                                </span>
+                            </div>
+
+                            <div className="w-full bg-gray-700 h-1.5 rounded-full overflow-hidden mb-2">
+                                <div
+                                    className={`h-full rounded-full ${progressColor} transition-all duration-500`}
+                                    style={{ width: `${Math.min(offer.percent_used, 100)}%` }}
+                                ></div>
+                            </div>
+
+                            <div className="text-xs text-gray-500 flex items-center gap-1">
+                                <Clock size={10} />
+                                <span>Remaining: <strong className="text-gray-300">{offer.remaining} {offer.unit}</strong></span>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
 
 // LocalStorage keys (same as Settings page)
 const STORAGE_KEYS = {
@@ -41,7 +106,25 @@ const AWSCloudHealthDashboard = () => {
     const [refreshInterval, setRefreshInterval] = useState(300); // seconds
     const [nextRefreshIn, setNextRefreshIn] = useState(null);
 
+    // Dashboard Data Hook
     const { data, loading, error, lastUpdated, refresh } = useDashboardData(selectedTimeRange);
+
+    // --- NEW: Free Tier State ---
+    const [billingData, setBillingData] = useState(null);
+    const [billingLoading, setBillingLoading] = useState(true);
+
+    // Function to fetch billing
+    const fetchBilling = async () => {
+        try {
+            setBillingLoading(true);
+            const res = await apiClient.get('/aws/billing');
+            setBillingData(res.data);
+        } catch (e) {
+            console.error("Failed to fetch billing data", e);
+        } finally {
+            setBillingLoading(false);
+        }
+    };
 
     // Load auto-refresh settings from localStorage
     useEffect(() => {
@@ -54,6 +137,8 @@ const AWSCloudHealthDashboard = () => {
         };
 
         loadSettings();
+        // Fetch billing on mount
+        fetchBilling();
 
         // Listen for storage changes (if user changes settings in another tab)
         const handleStorageChange = (e) => {
@@ -69,7 +154,8 @@ const AWSCloudHealthDashboard = () => {
     // Handle manual refresh
     const handleRefresh = useCallback(async () => {
         setRefreshing(true);
-        await refresh();
+        // Refresh both dashboard data AND billing data
+        await Promise.all([refresh(), fetchBilling()]);
         setRefreshing(false);
         setNextRefreshIn(refreshInterval); // Reset countdown after manual refresh
     }, [refresh, refreshInterval]);
@@ -97,6 +183,7 @@ const AWSCloudHealthDashboard = () => {
         // Actual refresh timer
         const refreshTimer = setInterval(() => {
             refresh();
+            fetchBilling(); // Also refresh billing
         }, refreshInterval * 1000);
 
         return () => {
@@ -295,6 +382,9 @@ const AWSCloudHealthDashboard = () => {
                         </div>
                     </div>
                 </div>
+
+                {/* 1. FREE TIER BANNER (INSERTED HERE) */}
+                <FreeTierBanner data={billingData} loading={billingLoading} />
 
                 {/* Top Section: Metrics Cards */}
                 <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
