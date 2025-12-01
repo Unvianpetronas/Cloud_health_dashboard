@@ -154,10 +154,15 @@ const AWSCloudHealthDashboard = () => {
     // Handle manual refresh
     const handleRefresh = useCallback(async () => {
         setRefreshing(true);
-        // Refresh both dashboard data AND billing data
-        await Promise.all([refresh(), fetchBilling()]);
-        setRefreshing(false);
-        setNextRefreshIn(refreshInterval); // Reset countdown after manual refresh
+        try {
+            // Refresh both dashboard data AND billing data
+            await Promise.all([refresh(), fetchBilling()]);
+            setNextRefreshIn(refreshInterval); // Reset countdown after manual refresh
+        } catch (error) {
+            console.error('Error refreshing dashboard:', error);
+        } finally {
+            setRefreshing(false);
+        }
     }, [refresh, refreshInterval]);
 
     // Auto-refresh effect
@@ -224,6 +229,22 @@ const AWSCloudHealthDashboard = () => {
         );
     };
 
+    // Time range options for Dashboard (without "Last Hour")
+    const dashboardTimeRangeOptions = [
+        { value: '24h', label: 'Last 24 Hours' },
+        { value: '7d', label: 'Last 7 Days' },
+        { value: '30d', label: 'Last 30 Days' }
+    ];
+
+    // Reset selectedTimeRange if it's '1h' (no longer available)
+    useEffect(() => {
+        if (selectedTimeRange === '1h') {
+            const newRange = '24h';
+            setSelectedTimeRange(newRange);
+            localStorage.setItem(STORAGE_KEYS.DEFAULT_TIME_RANGE, newRange);
+        }
+    }, [selectedTimeRange]);
+
     // Loading state
     if (loading && !data.ec2Summary) {
         return (
@@ -232,8 +253,6 @@ const AWSCloudHealthDashboard = () => {
                     title="AWS Cloud Health Dashboard"
                     onRefresh={handleRefresh}
                     refreshing={refreshing}
-                    selectedTimeRange={selectedTimeRange}
-                    onTimeRangeChange={handleTimeRangeChange}
                 />
                 <main className="container mx-auto px-6 flex items-center justify-center min-h-96">
                     <Card className="p-8 text-center animate-fade-in">
@@ -255,8 +274,6 @@ const AWSCloudHealthDashboard = () => {
                     title="AWS Cloud Health Dashboard"
                     onRefresh={handleRefresh}
                     refreshing={refreshing}
-                    selectedTimeRange={selectedTimeRange}
-                    onTimeRangeChange={handleTimeRangeChange}
                 />
                 <main className="container mx-auto px-6 flex items-center justify-center min-h-96">
                     <Card className="p-8 text-center max-w-md animate-scale-in">
@@ -354,6 +371,7 @@ const AWSCloudHealthDashboard = () => {
                 refreshing={refreshing}
                 selectedTimeRange={selectedTimeRange}
                 onTimeRangeChange={handleTimeRangeChange}
+                timeRangeOptions={dashboardTimeRangeOptions}
             />
 
             <main className="container mx-auto px-6 py-8 space-y-6">

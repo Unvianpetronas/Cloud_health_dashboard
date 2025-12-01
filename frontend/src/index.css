@@ -89,6 +89,16 @@ code {
     inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
+/* Header with solid background to prevent content bleeding through */
+.navbar--header {
+  background: var(--bg-1) !important;
+  backdrop-filter: blur(var(--blur-strong));
+  box-shadow: 
+    0 10px 30px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(110, 168, 255, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
 .nav-link {
   color: var(--txt-2);
   transition: all 0.3s ease;

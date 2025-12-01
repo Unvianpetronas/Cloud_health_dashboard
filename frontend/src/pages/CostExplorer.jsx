@@ -41,16 +41,22 @@ const CostExplorer = () => {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    const result = await costExplorerApi.getSummary(timeRange, 'DAILY', 30, true);
+    try {
+      const result = await costExplorerApi.getSummary(timeRange, 'DAILY', 30, true);
 
-    if (result.success) {
-      setData(result.data);
-      logger.info('Cost data refreshed');
-    } else {
-      setError(result.error);
+      if (result.success) {
+        setData(result.data);
+        logger.info('Cost data refreshed');
+      } else {
+        setError(result.error);
+        logger.error('Failed to refresh cost data:', result.error);
+      }
+    } catch (error) {
+      setError('Failed to refresh cost data');
+      logger.error('Error refreshing cost data:', error);
+    } finally {
+      setRefreshing(false);
     }
-
-    setRefreshing(false);
   };
 
   const formatCurrency = (amount) => {
@@ -116,7 +122,7 @@ const CostExplorer = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-cosmic-bg-0">
+      <div className="min-h-screen">
         <Header title="Cost Explorer" showNavigation={true} />
         <main className="p-6 max-w-7xl mx-auto">
           <div className="flex items-center justify-center h-96">
@@ -129,7 +135,7 @@ const CostExplorer = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-cosmic-bg-0">
+      <div className="min-h-screen">
         <Header title="Cost Explorer" showNavigation={true} />
         <main className="p-6 max-w-7xl mx-auto">
           <Card className="p-8 text-center">
@@ -151,7 +157,7 @@ const CostExplorer = () => {
   const forecastData = getForecastData();
 
   return (
-    <div className="min-h-screen bg-cosmic-bg-0">
+    <div className="min-h-screen">
       <Header title="Cost Explorer" showNavigation={true} />
 
       <main className="p-6 max-w-7xl mx-auto space-y-6">
