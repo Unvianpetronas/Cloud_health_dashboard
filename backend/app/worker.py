@@ -269,7 +269,7 @@ class CloudHealthWorker:
         try:
             logger.info(f"[{self.aws_account_id}] Collecting S3 metrics...")
 
-            s3_data = self.s3_scanner.scan_all_buckets()
+            s3_data = self.s3_scanner.list_all_buckets()
             timestamp = datetime.now()
 
             #Now includes client_id
@@ -531,6 +531,41 @@ class CloudHealthWorker:
             # Cache results for 1 hour (same as architecture.py route)
             cache_key = f'architecture:analysis:{self.aws_account_id}'
             self.cache.set(cache_key, analysis_report, ttl=3600)
+
+            recommendations = analysis_report.get('recommendations', [])
+
+            if recommendations:
+                logger.info(f"[{self.aws_account_id}] Storing {len(recommendations)} recommendations to DynamoDB...")
+
+                stored_count = 0
+                for rec in recommendations:
+                    try:
+                        await self.recommendation_model.store_recommendation(
+                            aws_account_id=self.aws_account_id,
+                            category=rec.get('category', 'General'),
+                            priority=rec.get('priority', 'MEDIUM'),
+                            title=rec.get('title', 'Recommendation'),
+                            description=rec.get('description', ''),
+                            impact=rec.get('impact', ''),
+                            effort=rec.get('effort', 'MEDIUM'),
+                            potential_savings=rec.get('potential_savings', 0),
+                            status='ACTIVE'
+                        )
+                        stored_count += 1
+                    except Exception as e:
+                        logger.error(f"[{self.aws_account_id}] Failed to store recommendation: {e}")
+                        continue
+
+                logger.info(
+                    f"[{self.aws_account_id}] Successfully stored {stored_count}/{len(recommendations)} recommendations")
+            else:
+                logger.info(f"[{self.aws_account_id}] No recommendations to store")
+
+            logger.info(
+                f"[{self.aws_account_id}] Architecture analysis complete! "
+                f"Overall score: {analysis_report.get('overall_score', 0)}/100"
+                f"Recommendations: {len(recommendations)}"
+            )
 
             logger.info(
                 f"[{self.aws_account_id}] Architecture analysis complete! "

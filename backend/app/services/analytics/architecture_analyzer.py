@@ -608,20 +608,43 @@ class ArchitectureAnalyzer:
         }
 
     def _generate_recommendations(
-        self,
-        well_architected: Dict,
-        cost_analysis: Dict,
-        performance: Dict,
-        security: Dict,
-        reliability: Dict
+            self,
+            well_architected: Dict,
+            cost_analysis: Dict,
+            performance: Dict,
+            security: Dict,
+            reliability: Dict
     ) -> List[Dict[str, Any]]:
         """
         Generate prioritized recommendations.
         Optimized with efficient list building and sorting.
+
+        IMPORTANT: Only generate recommendations when resources exist.
         """
         recommendations = []
+        pc = self._precomputed
 
+        # Calculate total resources
+        total_resources = pc.ec2_count + pc.s3_count
+
+        # ========================================
+        # EARLY RETURN: Empty account check
+        # ========================================
+        if total_resources == 0:
+            recommendations.append({
+                "priority": "HIGH",
+                "category": "Getting Started",
+                "title": "Deploy Your First Resources",
+                "description": "Your AWS account doesn't have any monitored resources yet. Deploy EC2 instances or S3 buckets to start receiving recommendations.",
+                "impact": "Start building your cloud infrastructure",
+                "effort": "MEDIUM",
+                "potential_savings": 0
+            })
+            return recommendations
+
+        # ========================================
         # Security recommendations (highest priority)
+        # ========================================
         if security['security_score'] < 80:
             if security['total_findings'] > 0:
                 recommendations.append({
@@ -645,8 +668,11 @@ class ArchitectureAnalyzer:
                 "potential_savings": 0
             })
 
+        # ========================================
         # Cost optimization recommendations
-        if cost_analysis['potential_monthly_savings'] > 100:
+        # Only if cost > threshold AND has resources
+        # ========================================
+        if cost_analysis['potential_monthly_savings'] > 100 and pc.ec2_count > 0:
             recommendations.append({
                 "priority": "HIGH",
                 "category": "Cost Optimization",
@@ -657,20 +683,39 @@ class ArchitectureAnalyzer:
                 "potential_savings": cost_analysis['potential_monthly_savings']
             })
 
+        # ========================================
         # Reliability recommendations
-        if not reliability['multi_az_deployment']:
-            recommendations.append({
-                "priority": "HIGH",
-                "category": "Reliability",
-                "title": "Enable Multi-AZ Deployment",
-                "description": "Deploy resources across multiple availability zones for fault tolerance",
-                "impact": "Improves availability and disaster recovery",
-                "effort": "MEDIUM",
-                "potential_savings": 0
-            })
+        # Only if has EC2 instances
+        # ========================================
+        if pc.ec2_count > 0:  # <-- FIX: Only recommend if has resources
+            if not reliability['multi_az_deployment']:
+                recommendations.append({
+                    "priority": "HIGH",
+                    "category": "Reliability",
+                    "title": "Enable Multi-AZ Deployment",
+                    "description": "Deploy resources across multiple availability zones for fault tolerance",
+                    "impact": "Improves availability and disaster recovery",
+                    "effort": "MEDIUM",
+                    "potential_savings": 0
+                })
 
+            # Multi-region recommendation
+            if not reliability['multi_region_deployment'] and pc.ec2_count >= 5:
+                recommendations.append({
+                    "priority": "MEDIUM",
+                    "category": "Reliability",
+                    "title": "Consider Multi-Region Deployment",
+                    "description": "Deploy critical workloads across multiple AWS regions for maximum resilience",
+                    "impact": "Protects against regional outages",
+                    "effort": "HIGH",
+                    "potential_savings": 0
+                })
+
+        # ========================================
         # Performance recommendations
-        if performance['performance_score'] < 80:
+        # Only if has EC2 instances
+        # ========================================
+        if pc.ec2_count > 0 and performance['performance_score'] < 80:
             for issue in performance['issues']:
                 if issue['type'] == 'old_generation_instances':
                     recommendations.append({
@@ -682,17 +727,62 @@ class ArchitectureAnalyzer:
                         "effort": "MEDIUM",
                         "potential_savings": cost_analysis['total_monthly_cost'] * 0.1
                     })
+                elif issue['type'] == 'high_cpu_utilization':
+                    recommendations.append({
+                        "priority": "HIGH",
+                        "category": "Performance",
+                        "title": "Address High CPU Utilization",
+                        "description": issue['message'],
+                        "impact": "Prevents performance degradation and outages",
+                        "effort": "MEDIUM",
+                        "potential_savings": 0
+                    })
 
+        # ========================================
         # Operational excellence recommendations
-        op_score = well_architected['pillars']['operational_excellence']['score']
-        if op_score < 80:
+        # Only if has resources to tag
+        # ========================================
+        if total_resources > 0:  # <-- FIX: Only recommend if has resources
+            op_score = well_architected['pillars']['operational_excellence']['score']
+
+            # Tagging recommendation
+            if op_score < 80 and pc.ec2_count > 0:
+                tagged_ratio = pc.tagged_instances_count / pc.ec2_count if pc.ec2_count > 0 else 0
+                if tagged_ratio < 0.8:  # Less than 80% tagged
+                    recommendations.append({
+                        "priority": "MEDIUM",
+                        "category": "Operational Excellence",
+                        "title": "Improve Resource Tagging",
+                        "description": f"Only {tagged_ratio * 100:.0f}% of your EC2 instances are properly tagged. Implement comprehensive tagging strategy for all resources.",
+                        "impact": "Better resource management and cost allocation",
+                        "effort": "LOW",
+                        "potential_savings": 0
+                    })
+
+            # Monitoring recommendation
+            if pc.ec2_count > 5 and pc.regions.__len__() == 1:
+                recommendations.append({
+                    "priority": "MEDIUM",
+                    "category": "Operational Excellence",
+                    "title": "Implement Centralized Monitoring",
+                    "description": "Set up CloudWatch dashboards and alarms for proactive monitoring",
+                    "impact": "Faster incident detection and response",
+                    "effort": "MEDIUM",
+                    "potential_savings": 0
+                })
+
+        # ========================================
+        # Backup and disaster recovery
+        # Only if has critical resources
+        # ========================================
+        if pc.ec2_count >= 3:
             recommendations.append({
                 "priority": "MEDIUM",
-                "category": "Operational Excellence",
-                "title": "Improve Resource Tagging",
-                "description": "Implement comprehensive tagging strategy for all resources",
-                "impact": "Better resource management and cost allocation",
-                "effort": "LOW",
+                "category": "Reliability",
+                "title": "Implement Automated Backup Strategy",
+                "description": "Configure AWS Backup or snapshots for EC2 and RDS instances",
+                "impact": "Protects against data loss",
+                "effort": "MEDIUM",
                 "potential_savings": 0
             })
 
