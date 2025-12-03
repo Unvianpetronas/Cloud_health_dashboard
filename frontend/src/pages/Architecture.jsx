@@ -41,16 +41,22 @@ const Architecture = () => {
 
   const handleRefresh = async () => {
     setAnalyzing(true);
-    const result = await architectureApi.analyze(true, true);
+    try {
+      const result = await architectureApi.analyze(true, true);
 
-    if (result.success) {
-      setData(result.data);
-      logger.info('Architecture analysis refreshed');
-    } else {
-      setError(result.error);
+      if (result.success) {
+        setData(result.data);
+        logger.info('Architecture analysis refreshed');
+      } else {
+        setError(result.error);
+        logger.error('Failed to refresh architecture data:', result.error);
+      }
+    } catch (error) {
+      setError('Failed to refresh architecture analysis');
+      logger.error('Error refreshing architecture data:', error);
+    } finally {
+      setAnalyzing(false);
     }
-
-    setAnalyzing(false);
   };
 
   const getScoreColor = (score) => {
@@ -87,7 +93,7 @@ const Architecture = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-cosmic-bg-0">
+      <div className="min-h-screen">
         <Header title="Architecture Analysis" showNavigation={true} />
         <main className="p-6 max-w-7xl mx-auto">
           <div className="flex items-center justify-center h-96">
@@ -100,7 +106,7 @@ const Architecture = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-cosmic-bg-0">
+      <div className="min-h-screen">
         <Header title="Architecture Analysis" showNavigation={true} />
         <main className="p-6 max-w-7xl mx-auto">
           <Card className="p-8 text-center">
@@ -136,7 +142,7 @@ const Architecture = () => {
   };
 
   return (
-    <div className="min-h-screen bg-cosmic-bg-0">
+    <div className="min-h-screen">
       <Header title="Architecture Analysis" showNavigation={true} />
 
       <main className="p-6 max-w-7xl mx-auto space-y-6">

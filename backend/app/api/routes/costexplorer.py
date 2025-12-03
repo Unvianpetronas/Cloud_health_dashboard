@@ -33,6 +33,11 @@ async def get_total_cost(
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(None, scanner.get_total_cost, start_date, end_date, granularity)
 
+        # Check if Cost Explorer is not enabled
+        if not result.get("enabled", True):
+            logger.warning("Cost Explorer not enabled - returning graceful response")
+            return {**result, "source": "aws", "cached": False}
+
         cache.set(cache_key, result, ttl=300)
         return {**result, "source": "aws", "cached": False}
     except Exception as e:
@@ -61,6 +66,10 @@ async def get_cost_by_service(
         scanner = CostExplorerScanner(client_provider)
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(None, scanner.get_cost_by_service, start_date, end_date, granularity)
+
+        if not result.get("enabled", True):
+            logger.warning("Cost Explorer not enabled - returning graceful response")
+            return {**result, "source": "aws", "cached": False}
 
         cache.set(cache_key, result, ttl=300)
         return {**result, "source": "aws", "cached": False}
@@ -91,6 +100,10 @@ async def get_cost_by_account(
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(None, scanner.get_cost_by_account, start_date, end_date, granularity)
 
+        if not result.get("enabled", True):
+            logger.warning("Cost Explorer not enabled - returning graceful response")
+            return {**result, "source": "aws", "cached": False}
+
         cache.set(cache_key, result, ttl=300)
         return {**result, "source": "aws", "cached": False}
     except Exception as e:
@@ -119,6 +132,10 @@ async def get_cost_forecast(
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(None, scanner.get_cost_forecast, days_ahead, metric)
 
+        if not result.get("enabled", True):
+            logger.warning("Cost Explorer not enabled - returning graceful response")
+            return {**result, "source": "aws", "cached": False}
+
         cache.set(cache_key, result, ttl=300)
         return {**result, "source": "aws", "cached": False}
     except Exception as e:
@@ -146,11 +163,16 @@ async def get_rightsizing_recommendations(
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(None, scanner.get_rightsizing_recommendations, service)
 
+        if not result.get("enabled", True):
+            logger.warning("Cost Explorer not enabled - returning graceful response")
+            return {**result, "source": "aws", "cached": False}
+
         cache.set(cache_key, result, ttl=600)
         return {**result, "source": "aws", "cached": False}
     except Exception as e:
         logger.exception("Error fetching rightsizing recommendations")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/costexplorer/summary", tags=["Cost Explorer"])
 async def get_cost_summary(
@@ -162,6 +184,7 @@ async def get_cost_summary(
 ):
     """
     Comprehensive cost summary: total cost, by service, by account, and forecast.
+    Returns graceful response if Cost Explorer is not enabled.
     """
     try:
         end_date = datetime.now(UTC).date().isoformat()
@@ -176,16 +199,31 @@ async def get_cost_summary(
         scanner = CostExplorerScanner(client_provider)
         loop = asyncio.get_running_loop()
 
+        # Execute all tasks
         total_task = loop.run_in_executor(None, scanner.get_total_cost, start_date, end_date, granularity)
         service_task = loop.run_in_executor(None, scanner.get_cost_by_service, start_date, end_date, granularity)
         account_task = loop.run_in_executor(None, scanner.get_cost_by_account, start_date, end_date, granularity)
         forecast_task = loop.run_in_executor(None, scanner.get_cost_forecast, forecast_days)
 
         total, by_service, by_account, forecast = await asyncio.gather(
-            total_task, service_task, account_task, forecast_task
+            total_task, service_task, account_task, forecast_task,
+            return_exceptions=False  # Let exceptions propagate
         )
 
+        # Check if Cost Explorer is not enabled (check any response)
+        if not total.get("enabled", True):
+            logger.warning("Cost Explorer not enabled - returning graceful summary response")
+            return {
+                "enabled": False,
+                "message": total.get("message", "Cost Explorer is not enabled or data is not available yet."),
+                "recommendation": total.get("recommendation", ""),
+                "period": {"start": start_date, "end": end_date},
+                "source": "aws",
+                "cached": False
+            }
+
         summary = {
+            "enabled": True,
             "total_cost": total,
             "by_service": by_service,
             "by_account": by_account,
@@ -195,6 +233,7 @@ async def get_cost_summary(
 
         cache.set(cache_key, summary, ttl=300)
         return {**summary, "source": "aws", "cached": False}
+
     except Exception as e:
         logger.exception("Error fetching cost summary")
         raise HTTPException(status_code=500, detail=f"CostExplorer summary error: {str(e)}")

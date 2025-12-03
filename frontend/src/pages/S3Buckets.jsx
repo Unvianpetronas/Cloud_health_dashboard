@@ -41,16 +41,22 @@ const S3Buckets = () => {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    const result = await s3Api.getSummary(true);
+    try {
+      const result = await s3Api.getSummary(true);
 
-    if (result.success) {
-      setData(result.data);
-      logger.info('S3 data refreshed');
-    } else {
-      setError(result.error);
+      if (result.success) {
+        setData(result.data);
+        logger.info('S3 data refreshed');
+      } else {
+        setError(result.error);
+        logger.error('Failed to refresh S3 data:', result.error);
+      }
+    } catch (error) {
+      setError('Failed to refresh S3 data');
+      logger.error('Error refreshing S3 data:', error);
+    } finally {
+      setRefreshing(false);
     }
-
-    setRefreshing(false);
   };
 
   // Helper to display GB nicely
@@ -96,7 +102,7 @@ const S3Buckets = () => {
 
   if (loading) {
     return (
-        <div className="min-h-screen bg-cosmic-bg-0">
+        <div className="min-h-screen">
           <Header title="S3 Buckets" showNavigation={true} />
           <main className="p-6 max-w-7xl mx-auto">
             <div className="flex items-center justify-center h-96">
@@ -109,7 +115,7 @@ const S3Buckets = () => {
 
   if (error) {
     return (
-        <div className="min-h-screen bg-cosmic-bg-0">
+        <div className="min-h-screen">
           <Header title="S3 Buckets" showNavigation={true} />
           <main className="p-6 max-w-7xl mx-auto">
             <Card className="p-8 text-center">
@@ -133,7 +139,7 @@ const S3Buckets = () => {
   const usageColor = usagePercent > 100 ? 'text-red-500' : usagePercent > 80 ? 'text-yellow-400' : 'text-green-400';
 
   return (
-      <div className="min-h-screen bg-cosmic-bg-0">
+      <div className="min-h-screen">
         <Header title="S3 Buckets" showNavigation={true} />
 
         <main className="p-6 max-w-7xl mx-auto space-y-6">

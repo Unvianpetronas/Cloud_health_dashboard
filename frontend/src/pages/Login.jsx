@@ -74,14 +74,14 @@ const Login = () => {
 
     if (lowerError.includes('account is inactive')) {
       return {
-        message: '💤 Your account is inactive. Please contact support to reactivate.',
+        message: ' Your account is inactive. Please contact support to reactivate.',
         type: 'warning'
       };
     }
 
     if (lowerError.includes('account is')) {
       return {
-        message: `🚫 ${errorText}. Please contact support.`,
+        message: ` ${errorText}. Please contact support.`,
         type: 'error'
       };
     }
@@ -89,7 +89,7 @@ const Login = () => {
     // Backend: 500 - Failed to create account
     if (lowerError.includes('failed to create account')) {
       return {
-        message: '❌ Failed to create your account. Please try again later.',
+        message: ' Failed to create your account. Please try again later.',
         type: 'error'
       };
     }
@@ -105,7 +105,7 @@ const Login = () => {
     // Backend: 401 - Invalid/expired refresh token
     if (lowerError.includes('invalid or expired refresh token')) {
       return {
-        message: '⏰ Your session has expired. Please log in again.',
+        message: ' Your session has expired. Please log in again.',
         type: 'warning'
       };
     }
@@ -113,7 +113,7 @@ const Login = () => {
     // Backend: 401 - Client not found or inactive
     if (lowerError.includes('client not found')) {
       return {
-        message: '❓ Account not found. Please check your credentials.',
+        message: ' Account not found. Please check your credentials.',
         type: 'error'
       };
     }
@@ -121,14 +121,14 @@ const Login = () => {
     // Network/Connection errors
     if (lowerError.includes('network') || lowerError.includes('fetch') || lowerError.includes('connection')) {
       return {
-        message: '🌐 Network error. Please check your internet connection and try again.',
+        message: ' Network error. Please check your internet connection and try again.',
         type: 'error'
       };
     }
 
     if (lowerError.includes('timeout')) {
       return {
-        message: '⏱️ Connection timed out. Please try again.',
+        message: '⏱ Connection timed out. Please try again.',
         type: 'warning'
       };
     }
@@ -136,14 +136,14 @@ const Login = () => {
     // AWS-specific errors
     if (lowerError.includes('expired')) {
       return {
-        message: '⏰ Your AWS credentials have expired. Please generate new keys in AWS Console.',
+        message: ' Your AWS credentials have expired. Please generate new keys in AWS Console.',
         type: 'error'
       };
     }
 
     if (lowerError.includes('permission') || lowerError.includes('denied') || lowerError.includes('accessdenied')) {
       return {
-        message: '🚫 Access denied. Your IAM user may lack required permissions.',
+        message: ' Access denied. Your IAM user may lack required permissions.',
         type: 'error'
       };
     }
@@ -157,7 +157,7 @@ const Login = () => {
 
     // Default error
     return {
-      message: `❌ ${errorText}`,
+      message: ` ${errorText}`,
       type: 'error'
     };
   };
@@ -183,7 +183,7 @@ const Login = () => {
     if (Object.keys(errors).length > 0) {
       const errorCount = Object.keys(errors).length;
       showToast(
-          `⚠️ Please fix ${errorCount} validation ${errorCount === 1 ? 'error' : 'errors'} before submitting`,
+          ` Please fix ${errorCount} validation ${errorCount === 1 ? 'error' : 'errors'} before submitting`,
           'warning'
       );
     }
@@ -231,8 +231,8 @@ const Login = () => {
       if (result.success) {
         showToast(
             result.is_new_account
-                ? '🎉 Welcome! Your account has been created successfully.'
-                : '✅ Login successful! Redirecting to dashboard...',
+                ? ' Welcome! Your account has been created successfully.'
+                : ' Login successful! Redirecting to dashboard...',
             'success'
         );
       } else {
@@ -252,7 +252,7 @@ const Login = () => {
     } catch (err) {
       // Catch này chỉ chạy nếu có lỗi code (runtime error) hoặc lỗi mạng nghiêm trọng mà authApi không bắt được
       console.error('Login error:', err);
-      showToast('❌ An unexpected error occurred. Please try again.', 'error');
+      showToast(' An unexpected error occurred. Please try again.', 'error');
     } finally {
       setIsSubmitting(false);
     }

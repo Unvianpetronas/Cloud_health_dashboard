@@ -199,7 +199,7 @@ const EC2InstancesTable = ({ instances = [], loading = false }) => {
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                     <div className="bg-cosmic-card-bg border border-cosmic-border rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl animate-scale-in">
                         {/* Modal Header */}
-                        <div className="sticky top-0 bg-cosmic-card-bg border-b border-cosmic-border px-6 py-4 flex items-center justify-between">
+                        <div className="sticky top-0 bg-cosmic-bg-1 backdrop-blur-md border-b border-cosmic-border px-6 py-4 flex items-center justify-between z-10">
                             <div className="flex items-center">
                                 <Server className="w-6 h-6 text-blue-400 mr-3" />
                                 <div>
