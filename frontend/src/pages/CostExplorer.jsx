@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, DollarSign, TrendingUp, TrendingDown, PieChart as PieChartIcon, BarChart3, AlertCircle, AlertTriangle, ExternalLink } from 'lucide-react';
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useAuth } from '../contexts/AuthContext';
 import Header from '../components/common/Header';
 import Card from '../components/common/Card';
@@ -129,13 +129,15 @@ const CostExplorer = () => {
 
   const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#84cc16'];
 
-  // Cost Explorer Not Enabled UI
+  // --- UI STATES ---
+
+  // 1. Cost Explorer Not Enabled UI
   if (!loading && !costExplorerEnabled) {
     return (
         <div className="min-h-screen bg-cosmic-bg-0">
           <Header title="Cost Explorer" showNavigation={true} />
-          <main className="p-6 max-w-4xl mx-auto">
-            <Card className="p-8 animate-fade-in">
+          <main className="container mx-auto px-6 py-8">
+            <Card className="p-8 animate-fade-in max-w-4xl mx-auto">
               <div className="text-center">
                 <div className="flex justify-center mb-4">
                   <div className="bg-yellow-500/10 p-4 rounded-full">
@@ -152,6 +154,7 @@ const CostExplorer = () => {
                   You'll need to enable Cost Explorer in the AWS Console to view cost analytics.
                 </p>
 
+                {/* Instructions */}
                 <div className="bg-cosmic-bg-2 border border-cosmic-border rounded-xl p-6 mb-6 text-left max-w-2xl mx-auto">
                   <h3 className="text-lg font-semibold text-cosmic-txt-1 mb-4 flex items-center">
                     <span className="bg-blue-500/10 text-blue-400 rounded-full w-8 h-8 flex items-center justify-center mr-3 font-bold">1</span>
@@ -159,60 +162,15 @@ const CostExplorer = () => {
                   </h3>
                   <div className="ml-11 space-y-3">
                     <p className="text-cosmic-txt-2 text-sm">
-                      • Go to <a
-                        href="https://console.aws.amazon.com/billing/home#/"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-400 hover:text-blue-300 inline-flex items-center"
-                    >
-                      AWS Billing Dashboard
-                      <ExternalLink size={14} className="ml-1" />
-                    </a>
+                      • Go to <a href="https://console.aws.amazon.com/billing/home#/" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 inline-flex items-center">AWS Billing Dashboard <ExternalLink size={14} className="ml-1" /></a>
                     </p>
-                    <p className="text-cosmic-txt-2 text-sm">
-                      • Navigate to "Cost Explorer" in the left sidebar
-                    </p>
-                    <p className="text-cosmic-txt-2 text-sm">
-                      • Click "Enable Cost Explorer"
-                    </p>
-                  </div>
-                </div>
-
-                <div className="bg-cosmic-bg-2 border border-cosmic-border rounded-xl p-6 mb-6 text-left max-w-2xl mx-auto">
-                  <h3 className="text-lg font-semibold text-cosmic-txt-1 mb-4 flex items-center">
-                    <span className="bg-blue-500/10 text-blue-400 rounded-full w-8 h-8 flex items-center justify-center mr-3 font-bold">2</span>
-                    Wait for Data Ingestion
-                  </h3>
-                  <div className="ml-11 space-y-3">
-                    <p className="text-cosmic-txt-2 text-sm">
-                      • Initial data ingestion takes <strong>24-48 hours</strong>
-                    </p>
-                    <p className="text-cosmic-txt-2 text-sm">
-                      • Cost forecast requires at least <strong>30 days</strong> of historical data
-                    </p>
-                    <p className="text-cosmic-txt-2 text-sm">
-                      • Come back after the waiting period to view your cost analytics
-                    </p>
-                  </div>
-                </div>
-
-                <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 mb-6 max-w-2xl mx-auto">
-                  <div className="flex items-start">
-                    <AlertCircle className="h-5 w-5 text-blue-400 mt-0.5 mr-3 flex-shrink-0" />
-                    <p className="text-sm text-cosmic-txt-2 text-left">
-                      <strong className="text-cosmic-txt-1">Note:</strong> AWS Cost Explorer is free to enable,
-                      but each API call costs $0.01. Your dashboard makes approximately 4-6 API calls per refresh.
-                    </p>
+                    <p className="text-cosmic-txt-2 text-sm">• Navigate to "Cost Explorer" in the left sidebar</p>
+                    <p className="text-cosmic-txt-2 text-sm">• Click "Enable Cost Explorer"</p>
                   </div>
                 </div>
 
                 <div className="flex justify-center space-x-4">
-                  <Button
-                      onClick={handleRefresh}
-                      disabled={refreshing}
-                      variant="primary"
-                      className="flex items-center space-x-2"
-                  >
+                  <Button onClick={handleRefresh} disabled={refreshing} variant="primary" className="flex items-center space-x-2">
                     {refreshing ? (
                         <>
                           <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
@@ -225,29 +183,7 @@ const CostExplorer = () => {
                         </>
                     )}
                   </Button>
-
-                  <a
-                      href="https://console.aws.amazon.com/billing/home#/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                  >
-                    <Button variant="secondary" className="flex items-center space-x-2">
-                      <span>Open AWS Console</span>
-                      <ExternalLink size={18} />
-                    </Button>
-                  </a>
                 </div>
-
-                <p className="text-xs text-cosmic-txt-2 mt-6">
-                  Having trouble? Check out the <a
-                    href="https://docs.aws.amazon.com/cost-management/latest/userguide/ce-enable.html"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-400 hover:text-blue-300"
-                >
-                  AWS Cost Explorer documentation
-                </a>
-                </p>
               </div>
             </Card>
           </main>
@@ -255,34 +191,32 @@ const CostExplorer = () => {
     );
   }
 
+  // 2. Loading State
   if (loading) {
     return (
         <div className="min-h-screen bg-cosmic-bg-0">
           <Header title="Cost Explorer" showNavigation={true} />
-          <main className="p-6 max-w-7xl mx-auto">
-            <div className="flex items-center justify-center h-96">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
-                <p className="text-cosmic-txt-2">Loading cost data...</p>
-              </div>
+          <main className="container mx-auto px-6 py-8 flex items-center justify-center min-h-96">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
+              <p className="text-cosmic-txt-2">Loading cost data...</p>
             </div>
           </main>
         </div>
     );
   }
 
+  // 3. Error State
   if (error) {
     return (
         <div className="min-h-screen bg-cosmic-bg-0">
           <Header title="Cost Explorer" showNavigation={true} />
-          <main className="p-6 max-w-7xl mx-auto">
-            <Card className="p-8 text-center">
+          <main className="container mx-auto px-6 py-8 flex items-center justify-center min-h-96">
+            <Card className="p-8 text-center max-w-md animate-scale-in">
               <AlertCircle className="h-16 w-16 text-red-400 mx-auto mb-4" />
               <h2 className="text-2xl font-bold text-cosmic-txt-1 mb-2">Failed to Load Cost Data</h2>
               <p className="text-cosmic-txt-2 mb-4">{error}</p>
-              <Button onClick={fetchCostData} variant="primary">
-                Retry
-              </Button>
+              <Button onClick={fetchCostData} variant="primary">Retry</Button>
             </Card>
           </main>
         </div>
@@ -298,22 +232,24 @@ const CostExplorer = () => {
       <div className="min-h-screen bg-cosmic-bg-0">
         <Header title="Cost Explorer" showNavigation={true} />
 
-        <main className="p-6 max-w-7xl mx-auto space-y-6">
-          {/* Header */}
-          <div className="flex justify-between items-center animate-fade-in">
-            <div>
+        {/* Updated Main Container to match Dashboard style */}
+        <main className="container mx-auto px-6 py-8 space-y-6">
+
+          {/* Title & Controls */}
+          <div className="flex flex-col md:flex-row justify-between items-center animate-fade-in">
+            <div className="mb-4 md:mb-0">
               <h1 className="text-3xl font-bold text-cosmic-txt-1 mb-2">AWS Cost Explorer</h1>
-              <p className="text-cosmic-txt-2">
-                Analyze and optimize your AWS spending
-              </p>
+              <p className="text-cosmic-txt-2">Analyze and optimize your AWS spending</p>
             </div>
-            <div className="flex items-center space-x-3">
+
+            <div className="flex items-center space-x-3 bg-cosmic-card p-2 rounded-xl border border-cosmic-border backdrop-blur-sm">
               <select
                   value={timeRange}
                   onChange={(e) => setTimeRange(parseInt(e.target.value))}
-                  className="px-4 py-2 bg-cosmic-bg-2 border border-cosmic-border rounded-xl text-cosmic-txt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-4 py-2 bg-cosmic-bg-2 border border-cosmic-border rounded-lg text-cosmic-txt-1 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               >
-                <option value={7}>Last 7 days</option>
+                  <option value={7}>Last 7 days</option>
+                <option value={14}>Last 14 days</option>
                 <option value={30}>Last 30 days</option>
                 <option value={90}>Last 90 days</option>
               </select>
@@ -321,16 +257,16 @@ const CostExplorer = () => {
                   onClick={handleRefresh}
                   disabled={refreshing}
                   variant="primary"
-                  className="flex items-center space-x-2"
+                  className="flex items-center space-x-2 text-sm py-2"
               >
                 {refreshing ? (
                     <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                      <span>Refreshing...</span>
+                      <div className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent"></div>
+                      <span>Refreshing</span>
                     </>
                 ) : (
                     <>
-                      <RefreshCw size={18} />
+                      <RefreshCw size={16} />
                       <span>Refresh</span>
                     </>
                 )}
@@ -339,8 +275,8 @@ const CostExplorer = () => {
           </div>
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="p-6 animate-fade-in">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card className="p-6 animate-slide-up">
               <div className="flex items-center justify-between mb-2">
                 <div>
                   <div className="text-sm text-cosmic-txt-2 mb-1">Total Cost ({timeRange} days)</div>
@@ -348,11 +284,13 @@ const CostExplorer = () => {
                     {formatCurrency(getTotalCost())}
                   </div>
                 </div>
-                <DollarSign className="h-12 w-12 text-green-400" />
+                <div className="p-3 bg-green-500/10 rounded-lg">
+                  <DollarSign className="h-8 w-8 text-green-400" />
+                </div>
               </div>
             </Card>
 
-            <Card className="p-6 animate-fade-in" style={{animationDelay: '0.1s'}}>
+            <Card className="p-6 animate-slide-up" style={{animationDelay: '0.1s'}}>
               <div className="flex items-center justify-between mb-2">
                 <div>
                   <div className="text-sm text-cosmic-txt-2 mb-1">30-Day Forecast</div>
@@ -360,11 +298,13 @@ const CostExplorer = () => {
                     {formatCurrency(getForecastTotal())}
                   </div>
                 </div>
-                <TrendingUp className="h-12 w-12 text-blue-400" />
+                <div className="p-3 bg-blue-500/10 rounded-lg">
+                  <TrendingUp className="h-8 w-8 text-blue-400" />
+                </div>
               </div>
             </Card>
 
-            <Card className="p-6 animate-fade-in" style={{animationDelay: '0.2s'}}>
+            <Card className="p-6 animate-slide-up" style={{animationDelay: '0.2s'}}>
               <div className="flex items-center justify-between mb-2">
                 <div>
                   <div className="text-sm text-cosmic-txt-2 mb-1">Weekly Trend</div>
@@ -372,11 +312,13 @@ const CostExplorer = () => {
                     {costTrend >= 0 ? '+' : ''}{costTrend.toFixed(1)}%
                   </div>
                 </div>
-                {costTrend >= 0 ? (
-                    <TrendingUp className="h-12 w-12 text-red-400" />
-                ) : (
-                    <TrendingDown className="h-12 w-12 text-green-400" />
-                )}
+                <div className={`p-3 rounded-lg ${costTrend >= 0 ? 'bg-red-500/10' : 'bg-green-500/10'}`}>
+                  {costTrend >= 0 ? (
+                      <TrendingUp className="h-8 w-8 text-red-400" />
+                  ) : (
+                      <TrendingDown className="h-8 w-8 text-green-400" />
+                  )}
+                </div>
               </div>
             </Card>
           </div>
@@ -385,28 +327,35 @@ const CostExplorer = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Cost Trend */}
             {costTrendData.length > 0 && (
-                <Card className="p-6 animate-fade-in" style={{animationDelay: '0.3s'}}>
-                  <div className="flex items-center mb-4">
-                    <BarChart3 className="h-6 w-6 text-blue-400 mr-2" />
-                    <h2 className="text-xl font-semibold text-cosmic-txt-1">Daily Cost Trend</h2>
+                <Card className="p-6 animate-slide-up" style={{animationDelay: '0.3s'}}>
+                  <div className="flex items-center mb-6">
+                    <div className="p-2 bg-blue-500/10 rounded-lg mr-3">
+                      <BarChart3 className="h-5 w-5 text-blue-400" />
+                    </div>
+                    <h2 className="text-lg font-semibold text-cosmic-txt-1">Daily Cost Trend</h2>
                   </div>
                   <ResponsiveContainer width="100%" height={300}>
                     <LineChart data={costTrendData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
                       <XAxis
                           dataKey="date"
                           tick={{ fill: '#9ca3af', fontSize: 11 }}
-                          angle={-45}
-                          textAnchor="end"
-                          height={80}
+                          axisLine={false}
+                          tickLine={false}
+                          dy={10}
                       />
-                      <YAxis tick={{ fill: '#9ca3af' }} />
+                      <YAxis
+                          tick={{ fill: '#9ca3af', fontSize: 11 }}
+                          axisLine={false}
+                          tickLine={false}
+                          tickFormatter={(value) => `$${value}`}
+                      />
                       <Tooltip
-                          contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
-                          labelStyle={{ color: '#f3f4f6' }}
+                          contentStyle={{ backgroundColor: '#111827', border: '1px solid #374151', borderRadius: '8px', color: '#f3f4f6' }}
+                          itemStyle={{ color: '#fff' }}
                           formatter={(value) => formatCurrency(value)}
                       />
-                      <Line type="monotone" dataKey="cost" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} />
+                      <Line type="monotone" dataKey="cost" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, fill: '#1d4ed8' }} activeDot={{ r: 6 }} />
                     </LineChart>
                   </ResponsiveContainer>
                 </Card>
@@ -414,10 +363,12 @@ const CostExplorer = () => {
 
             {/* Cost by Service */}
             {costByService.length > 0 && (
-                <Card className="p-6 animate-fade-in" style={{animationDelay: '0.4s'}}>
-                  <div className="flex items-center mb-4">
-                    <PieChartIcon className="h-6 w-6 text-purple-400 mr-2" />
-                    <h2 className="text-xl font-semibold text-cosmic-txt-1">Cost by Service</h2>
+                <Card className="p-6 animate-slide-up" style={{animationDelay: '0.4s'}}>
+                  <div className="flex items-center mb-6">
+                    <div className="p-2 bg-purple-500/10 rounded-lg mr-3">
+                      <PieChartIcon className="h-5 w-5 text-purple-400" />
+                    </div>
+                    <h2 className="text-lg font-semibold text-cosmic-txt-1">Cost by Service</h2>
                   </div>
                   <ResponsiveContainer width="100%" height={300}>
                     <PieChart>
@@ -426,7 +377,7 @@ const CostExplorer = () => {
                           cx="50%"
                           cy="50%"
                           labelLine={false}
-                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                          label={({ name, percent }) => percent > 0.05 ? `${name} ${(percent * 100).toFixed(0)}%` : ''}
                           outerRadius={100}
                           fill="#8884d8"
                           dataKey="value"
@@ -436,8 +387,8 @@ const CostExplorer = () => {
                         ))}
                       </Pie>
                       <Tooltip
-                          contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
-                          labelStyle={{ color: '#f3f4f6' }}
+                          contentStyle={{ backgroundColor: '#111827', border: '1px solid #374151', borderRadius: '8px', color: '#f3f4f6' }}
+                          itemStyle={{ color: '#fff' }}
                           formatter={(value) => formatCurrency(value)}
                       />
                     </PieChart>
@@ -448,26 +399,33 @@ const CostExplorer = () => {
 
           {/* Forecast Chart */}
           {forecastData.length > 0 && (
-              <Card className="p-6 animate-fade-in" style={{animationDelay: '0.5s'}}>
-                <div className="flex items-center mb-4">
-                  <TrendingUp className="h-6 w-6 text-cyan-400 mr-2" />
-                  <h2 className="text-xl font-semibold text-cosmic-txt-1">30-Day Cost Forecast</h2>
+              <Card className="p-6 animate-slide-up" style={{animationDelay: '0.5s'}}>
+                <div className="flex items-center mb-6">
+                  <div className="p-2 bg-cyan-500/10 rounded-lg mr-3">
+                    <TrendingUp className="h-5 w-5 text-cyan-400" />
+                  </div>
+                  <h2 className="text-lg font-semibold text-cosmic-txt-1">30-Day Cost Forecast</h2>
                 </div>
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={forecastData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
                     <XAxis
                         dataKey="date"
                         tick={{ fill: '#9ca3af', fontSize: 11 }}
-                        angle={-45}
-                        textAnchor="end"
-                        height={80}
+                        axisLine={false}
+                        tickLine={false}
+                        dy={10}
                     />
-                    <YAxis tick={{ fill: '#9ca3af' }} />
+                    <YAxis
+                        tick={{ fill: '#9ca3af', fontSize: 11 }}
+                        axisLine={false}
+                        tickLine={false}
+                        tickFormatter={(value) => `$${value}`}
+                    />
                     <Tooltip
-                        contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
-                        labelStyle={{ color: '#f3f4f6' }}
-                        formatter={(value) => formatCurrency(value)}
+                        contentStyle={{ backgroundColor: '#111827', border: '1px solid #374151', borderRadius: '8px', color: '#f3f4f6' }}
+                        itemStyle={{ color: '#fff' }}
+                        formatter={(value) => [formatCurrency(value), "Forecast"]}
                     />
                     <Line
                         type="monotone"
@@ -484,16 +442,16 @@ const CostExplorer = () => {
 
           {/* Service Breakdown Table */}
           {costByService.length > 0 && (
-              <Card className="p-6 animate-fade-in" style={{animationDelay: '0.6s'}}>
-                <h2 className="text-xl font-semibold text-cosmic-txt-1 mb-4">Service Cost Breakdown</h2>
+              <Card className="p-6 animate-slide-up" style={{animationDelay: '0.6s'}}>
+                <h2 className="text-lg font-semibold text-cosmic-txt-1 mb-4">Service Cost Breakdown</h2>
 
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
                     <tr className="border-b border-cosmic-border">
-                      <th className="text-left py-3 px-4 text-sm font-semibold text-cosmic-txt-1">Service</th>
-                      <th className="text-right py-3 px-4 text-sm font-semibold text-cosmic-txt-1">Cost</th>
-                      <th className="text-right py-3 px-4 text-sm font-semibold text-cosmic-txt-1">Percentage</th>
+                      <th className="text-left py-3 px-4 text-xs font-semibold text-cosmic-muted uppercase tracking-wider">Service</th>
+                      <th className="text-right py-3 px-4 text-xs font-semibold text-cosmic-muted uppercase tracking-wider">Cost</th>
+                      <th className="text-right py-3 px-4 text-xs font-semibold text-cosmic-muted uppercase tracking-wider">Percentage</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -502,10 +460,10 @@ const CostExplorer = () => {
                       const percentage = (service.value / totalCost) * 100;
 
                       return (
-                          <tr key={index} className="border-b border-cosmic-border hover:bg-cosmic-bg-2 transition-colors">
-                            <td className="py-3 px-4 text-sm text-cosmic-txt-1 font-medium flex items-center space-x-2">
+                          <tr key={index} className="border-b border-cosmic-border/50 hover:bg-cosmic-bg-2 transition-colors">
+                            <td className="py-3 px-4 text-sm text-cosmic-txt-1 font-medium flex items-center space-x-3">
                               <div
-                                  className="w-3 h-3 rounded-full"
+                                  className="w-2.5 h-2.5 rounded-full shadow-sm"
                                   style={{ backgroundColor: COLORS[index % COLORS.length] }}
                               ></div>
                               <span>{service.name}</span>

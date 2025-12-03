@@ -71,10 +71,10 @@ const Home = () => {
 
           <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4 justify-items-center">
             {[
-              { name: 'Developer 1', role: 'Cloud / Backend Engineer', image: '/dev_pic1.jpg' },
-              { name: 'Developer 2', role: 'Frontend / UI Engineer', image: '/dev_pic2.jpg' },
-              { name: 'Developer 3', role: 'DevOps / Infrastructure', image: '/dev_pic3.jpg' },
-              { name: 'Developer 4', role: 'QA / Automation Engineer', image: '/dev_pic4.jpg' },
+              { name: 'Developer 1', role: 'Cloud / Backend Engineer / Project Manager', image: '/dev_pic1.jpg' },
+              { name: 'Developer 2', role: 'Frontend / DevOps / Team Leader / Backend Engineer', image: '/dev_pic2.jpg' },
+              { name: 'Developer 3', role: 'Backend Engineer / Infrastructure / Tester', image: '/dev_pic3.jpg' },
+              { name: 'Developer 4', role: 'QA / Frontend / UI Engineer', image: '/dev_pic4.jpg' },
             ].map((dev, idx) => (
               <div
                 key={idx}
@@ -99,9 +99,6 @@ const Home = () => {
                   </div>
 
                   <p className="text-xs text-cosmic-muted leading-relaxed">
-                    Replace this text with a short bio or responsibilities for each
-                    member, such as AWS services handled, features implemented, or
-                    favorite cloud tools.
                   </p>
                 </div>
               </div>
