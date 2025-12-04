@@ -3,7 +3,7 @@ import useDashboardData from '../hooks/useDashboardData';
 import {
     AlertTriangle, DollarSign,
     RefreshCw, Server, Shield, Zap,
-    Gift, CheckCircle, Clock
+    Gift, CheckCircle, Clock, Lock
 } from 'lucide-react';
 
 import Header from '../components/common/Header';
@@ -14,9 +14,91 @@ import EC2InstancesTable from '../components/dashboard/EC2InstancesTable';
 import GuardDutyFindingsTable from '../components/dashboard/GuardDutyFindingsTable';
 import apiClient from '../services/api';
 
-// --- NEW COMPONENT: FREE TIER BANNER ---
+// --- PERMISSION ERROR BANNER COMPONENT ---
+const PermissionErrorBanner = ({ service, permissions, instructions }) => {
+    return (
+        <div className="mb-6 rounded-xl overflow-hidden border border-red-500/30 bg-gradient-to-r from-red-900/40 to-orange-900/40 backdrop-blur-sm animate-fade-in">
+            <div className="p-4 border-b border-red-500/30 flex justify-between items-center bg-red-900/20">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-red-500 rounded-lg shadow-lg shadow-red-500/20">
+                        <Lock className="text-white h-5 w-5" />
+                    </div>
+                    <div>
+                        <h2 className="text-base font-bold text-white">Permission Required</h2>
+                        <p className="text-red-300 text-xs">AWS {service} service access is required</p>
+                    </div>
+                </div>
+                <div className="px-3 py-1 bg-red-500/20 border border-red-500 text-red-300 rounded-full text-xs font-bold flex items-center gap-2">
+                    <AlertTriangle size={14} /> Access Denied
+                </div>
+            </div>
+
+            <div className="p-5 space-y-4">
+                <div className="flex items-start gap-3">
+                    <AlertTriangle className="text-red-400 flex-shrink-0 mt-1" size={20} />
+                    <div className="flex-1">
+                        <h3 className="text-white font-semibold mb-2">What happened?</h3>
+                        <p className="text-gray-300 text-sm leading-relaxed">
+                            {instructions || `Your AWS account does not have permission to access the ${service} service.`}
+                        </p>
+                    </div>
+                </div>
+
+                {permissions && permissions.length > 0 && (
+                    <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                        <h4 className="text-white font-semibold text-sm mb-2">Required IAM Permissions:</h4>
+                        <ul className="space-y-1">
+                            {permissions.map((perm, index) => (
+                                <li key={index} className="text-emerald-400 text-sm font-mono flex items-center gap-2">
+                                    <span className="text-gray-500">•</span>
+                                    {perm}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+
+                <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+                    <h4 className="text-white font-semibold text-sm mb-2 flex items-center gap-2">
+                        <span>🔧</span> How to fix this:
+                    </h4>
+                    <ol className="space-y-2 text-sm text-gray-300">
+                        <li className="flex gap-2">
+                            <span className="text-blue-400 font-bold">1.</span>
+                            <span>Go to AWS IAM Console → Users → Select your IAM user</span>
+                        </li>
+                        <li className="flex gap-2">
+                            <span className="text-blue-400 font-bold">2.</span>
+                            <span>Click "Add permissions" → "Create inline policy"</span>
+                        </li>
+                        <li className="flex gap-2">
+                            <span className="text-blue-400 font-bold">3.</span>
+                            <span>Add the required permissions listed above</span>
+                        </li>
+                        <li className="flex gap-2">
+                            <span className="text-blue-400 font-bold">4.</span>
+                            <span>Refresh this dashboard</span>
+                        </li>
+                    </ol>
+                    <a
+                        href="https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_manage-attach-detach.html"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 mt-3 text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors"
+                    >
+                        View AWS IAM Documentation
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- FREE TIER BANNER COMPONENT ---
 const FreeTierBanner = ({ data, loading }) => {
-    // Hide if loading, no data, or explicitly not active
     if (loading || !data || !data.is_active || !data.offers || data.offers.length === 0) {
         return null;
     }
@@ -77,7 +159,7 @@ const FreeTierBanner = ({ data, loading }) => {
     );
 };
 
-// LocalStorage keys (same as Settings page)
+// LocalStorage keys
 const STORAGE_KEYS = {
     AUTO_REFRESH: 'dashboard_autoRefresh',
     REFRESH_INTERVAL: 'dashboard_refreshInterval',
@@ -103,13 +185,13 @@ const AWSCloudHealthDashboard = () => {
 
     // Auto-refresh settings state
     const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
-    const [refreshInterval, setRefreshInterval] = useState(300); // seconds
+    const [refreshInterval, setRefreshInterval] = useState(300);
     const [nextRefreshIn, setNextRefreshIn] = useState(null);
 
     // Dashboard Data Hook
     const { data, loading, error, lastUpdated, refresh } = useDashboardData(selectedTimeRange);
 
-    // --- NEW: Free Tier State ---
+    // Free Tier State
     const [billingData, setBillingData] = useState(null);
     const [billingLoading, setBillingLoading] = useState(true);
 
@@ -137,10 +219,8 @@ const AWSCloudHealthDashboard = () => {
         };
 
         loadSettings();
-        // Fetch billing on mount
         fetchBilling();
 
-        // Listen for storage changes (if user changes settings in another tab)
         const handleStorageChange = (e) => {
             if (Object.values(STORAGE_KEYS).includes(e.key)) {
                 loadSettings();
@@ -154,10 +234,9 @@ const AWSCloudHealthDashboard = () => {
     // Handle manual refresh
     const handleRefresh = useCallback(async () => {
         setRefreshing(true);
-        // Refresh both dashboard data AND billing data
         await Promise.all([refresh(), fetchBilling()]);
         setRefreshing(false);
-        setNextRefreshIn(refreshInterval); // Reset countdown after manual refresh
+        setNextRefreshIn(refreshInterval);
     }, [refresh, refreshInterval]);
 
     // Auto-refresh effect
@@ -167,10 +246,8 @@ const AWSCloudHealthDashboard = () => {
             return;
         }
 
-        // Initialize countdown
         setNextRefreshIn(refreshInterval);
 
-        // Countdown timer (updates every second)
         const countdownTimer = setInterval(() => {
             setNextRefreshIn(prev => {
                 if (prev === null || prev <= 1) {
@@ -180,10 +257,9 @@ const AWSCloudHealthDashboard = () => {
             });
         }, 1000);
 
-        // Actual refresh timer
         const refreshTimer = setInterval(() => {
             refresh();
-            fetchBilling(); // Also refresh billing
+            fetchBilling();
         }, refreshInterval * 1000);
 
         return () => {
@@ -196,32 +272,6 @@ const AWSCloudHealthDashboard = () => {
     const handleTimeRangeChange = (newRange) => {
         setSelectedTimeRange(newRange);
         localStorage.setItem(STORAGE_KEYS.DEFAULT_TIME_RANGE, newRange);
-    };
-
-    // ✅ Custom label renderer for pie chart
-    const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }) => {
-        const RADIAN = Math.PI / 180;
-        const radius = outerRadius + 35;
-        const x = cx + radius * Math.cos(-midAngle * RADIAN);
-        const y = cy + radius * Math.sin(-midAngle * RADIAN);
-        const textAnchor = x > cx ? 'start' : 'end';
-
-        return (
-            <text
-                x={x}
-                y={y}
-                fill="#e6e9f5"
-                textAnchor={textAnchor}
-                dominantBaseline="central"
-                style={{
-                    fontSize: '13px',
-                    fontWeight: '500',
-                    textShadow: '0 2px 4px rgba(0,0,0,0.5)'
-                }}
-            >
-                {`${name} ${(percent * 100).toFixed(0)}%`}
-            </text>
-        );
     };
 
     // Loading state
@@ -286,7 +336,10 @@ const AWSCloudHealthDashboard = () => {
         serviceHealth
     } = data;
 
-    // Calculate EC2 metrics
+    // ✅ Check for EC2 permission error
+    const hasEC2PermissionError = ec2Summary?.error === 'permission_denied';
+
+    // Calculate EC2 metrics (with null checks for permission errors)
     const totalInstances = ec2Summary?.total_instances || 0;
     const runningInstances = ec2Summary?.by_state?.running || 0;
     const totalCost = ec2Cost?.total_estimated_cost || 0;
@@ -357,7 +410,7 @@ const AWSCloudHealthDashboard = () => {
             />
 
             <main className="container mx-auto px-6 py-8 space-y-6">
-                {/* Status Banner - Updated with dynamic auto-refresh info */}
+                {/* Status Banner */}
                 <div className="mb-6 animate-fade-in">
                     <div className="flex items-center justify-center">
                         <div className="inline-flex items-center space-x-3 text-sm text-cosmic-secondary bg-cosmic-card px-6 py-3 rounded-full border border-cosmic-border backdrop-blur-sm shadow-lg">
@@ -383,7 +436,16 @@ const AWSCloudHealthDashboard = () => {
                     </div>
                 </div>
 
-                {/* 1. FREE TIER BANNER (INSERTED HERE) */}
+                {/* ✅ EC2 Permission Error Banner (shown BEFORE Free Tier) */}
+                {hasEC2PermissionError && (
+                    <PermissionErrorBanner
+                        service={ec2Summary.service}
+                        permissions={ec2Summary.required_permissions}
+                        instructions={ec2Summary.instructions}
+                    />
+                )}
+
+                {/* Free Tier Banner */}
                 <FreeTierBanner data={billingData} loading={billingLoading} />
 
                 {/* Top Section: Metrics Cards */}
@@ -484,8 +546,9 @@ const AWSCloudHealthDashboard = () => {
                 {/* EC2 Instances Table Section */}
                 <section className="animate-slide-up" style={{ animationDelay: '0.2s' }}>
                     <EC2InstancesTable
-                        instances={ec2Instances || []}
+                        instances={hasEC2PermissionError ? [] : (ec2Instances || [])}
                         loading={loading}
+                        permissionError={hasEC2PermissionError}
                     />
                 </section>
 

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from app.services.aws.client import AWSClientProvider
 from app.services.aws.cloudwatch import CloudWatchScanner
-from app.api.middleware.dependency import get_aws_client_provider
+from app.api.middleware.dependency import *
 from app.services.cache_client.redis_client import cache
 import asyncio
 import logging
@@ -23,7 +23,9 @@ async def get_cloudwatch_metrics(
         period: int = 300,
         stat: str = "Average",
         force_refresh: bool = False,
-        client_provider: AWSClientProvider = Depends(get_aws_client_provider)
+        client_provider: AWSClientProvider = Depends(get_aws_client_provider),
+        client_id: str = Depends(get_current_client_id_dependency)
+
 ):
     """
     Scan CloudWatch metrics across all regions.
@@ -46,7 +48,7 @@ async def get_cloudwatch_metrics(
 
         # --- Prepare cache key ---
         dim_key = dimensions or "none"
-        cache_key = f"cloudwatch:{namespace}:{metric_name}:{period}:{stat}:{dim_key}"
+        cache_key = f"cloudwatch:{namespace}:{metric_name}:{period}:{stat}:{dim_key}:{client_id}"
 
         if not force_refresh:
             cache_data = cache.get(cache_key)
