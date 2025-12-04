@@ -5,7 +5,7 @@ import os
 from cryptography.fernet import Fernet
 
 
-environment = os.getenv("ENVIRONMENT", "production") # if wat to change to development environment change this to development
+environment = os.getenv("ENVIRONMENT", "development") # if wat to change to development environment change this to development
 env_file = f".env.{environment}"
 if os.path.exists(env_file):
     load_dotenv(env_file)

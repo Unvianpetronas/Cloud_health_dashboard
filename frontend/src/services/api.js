@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_BASE_URL || 'http://localhost:8000/api/v1' ;
-//const API_BASE_URL = 'http://localhost:8000/api/v1' ;   //if you wanted to local run comment API_BASE_URL above
+//const API_BASE_URL = process.env.REACT_APP_BASE_URL || 'http://localhost:8000/api/v1' ;
+const API_BASE_URL = 'http://localhost:8000/api/v1' ;   //if you wanted to local run comment API_BASE_URL above
 
 console.log('API Base URL:', API_BASE_URL); // Debug log
 
