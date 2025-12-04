@@ -22,7 +22,7 @@ const Header = ({
     return (
         <div>
             <header className="navbar navbar--header mx-6 mt-4 mb-2">
-              
+
                 <div className="flex justify-between items-center gap-4">
 
                     <div className="flex items-center space-x-4">
