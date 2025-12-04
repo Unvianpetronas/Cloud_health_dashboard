@@ -44,23 +44,6 @@ const Header = ({
               </div>
             </div>
 
-            {/* Right: Controls and User Menu */}
-            <div className="flex items-center space-x-4">
-              {/* Time Range Selector */}
-              {onTimeRangeChange && (
-                  <select
-                      value={selectedTimeRange}
-                      onChange={(e) => onTimeRangeChange?.(e.target.value)}
-                      className="px-3 py-2 border border-cosmic-border rounded-xl bg-cosmic-card text-cosmic-txt-1 text-sm focus-ring backdrop-blur-cosmic"
-                  >
-                    {timeRangeOptions.map(option => (
-                        <option key={option.value} value={option.value} className="bg-cosmic-bg-1">
-                          {option.label}
-                        </option>
-                    ))}
-                  </select>
-              )}
-
               {/* Refresh Button */}
               {onRefresh && (
                   <button
@@ -83,7 +66,6 @@ const Header = ({
               {/* User Menu - NEW! */}
               <UserMenu />
             </div>
-          </div>
         </header>
 
         {showNavigation && <Navigation />}
