@@ -21,14 +21,9 @@ const Header = ({
     return () => clearInterval(timer);
   }, []);
 
-  const defaultTimeRangeOptions = [
-    { value: '1h', label: 'Last Hour' },
-    { value: '24h', label: 'Last 24 Hours' },
-    { value: '7d', label: 'Last 7 Days' },
-    { value: '30d', label: 'Last 30 Days' }
-  ];
 
-  const timeRangeOptions = customTimeRangeOptions || defaultTimeRangeOptions;
+
+  const timeRangeOptions = customTimeRangeOptions;
 
   return (
       <div>

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from app.services.aws.client import AWSClientProvider
 from app.services.aws.guardduty import GuardDutyScanner
-from app.api.middleware.dependency import get_aws_client_provider
+from app.api.middleware.dependency import get_current_client_id_dependency,get_aws_client_provider
 from app.services.cache_client.redis_client import cache
 import asyncio
 import logging
@@ -13,10 +13,11 @@ logger = logging.getLogger(__name__)
 @router.get("/guardduty/status", tags=["GuardDuty"])
 async def check_guardduty_status(
         client_provider: AWSClientProvider = Depends(get_aws_client_provider),
+        client_id: str = Depends(get_current_client_id_dependency),
         force_refresh: bool = False
 ):
     try:
-        cache_key = "guardduty:status"
+        cache_key = f"guardduty:status:{client_id}"
 
         if not force_refresh:
             cached = cache.get(cache_key)
@@ -42,10 +43,11 @@ async def check_guardduty_status(
 async def get_all_findings(
         client_provider: AWSClientProvider = Depends(get_aws_client_provider),
         severity_filter: int = Query(4, ge=0, le=10, description="Minimum severity (0-10)"),
+        client_id: str = Depends(get_current_client_id_dependency),
         force_refresh: bool = False
 ):
     try:
-        cache_key = f"guardduty:findings:severity{severity_filter}"
+        cache_key = f"guardduty:findings:severity{severity_filter}:{client_id}"
 
         if not force_refresh:
             cached = cache.get(cache_key)
@@ -69,10 +71,11 @@ async def get_all_findings(
 @router.get("/guardduty/critical", tags=["GuardDuty"])
 async def get_critical_findings(
         client_provider: AWSClientProvider = Depends(get_aws_client_provider),
+        client_id: str = Depends(get_current_client_id_dependency),
         force_refresh: bool = False
 ):
     try:
-        cache_key = "guardduty:critical"
+        cache_key = f"guardduty:critical:{client_id}"
 
         if not force_refresh:
             cached = cache.get(cache_key)
@@ -95,10 +98,11 @@ async def get_critical_findings(
 @router.get("/guardduty/summary", tags=["GuardDuty"])
 async def get_findings_summary(
         client_provider: AWSClientProvider = Depends(get_aws_client_provider),
+        client_id: str = Depends(get_current_client_id_dependency),
         force_refresh: bool = False
 ):
     try:
-        cache_key = "guardduty:summary"
+        cache_key = f"guardduty:summary:{client_id}"
 
         if not force_refresh:
             cached = cache.get(cache_key)

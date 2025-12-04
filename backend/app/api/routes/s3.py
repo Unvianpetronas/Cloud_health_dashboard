@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from app.services.aws.client import AWSClientProvider
 from app.services.aws.s3 import S3Scanner
-from app.api.middleware.dependency import get_aws_client_provider
+from app.api.middleware.dependency import get_aws_client_provider,get_current_client_id_dependency
 from app.services.cache_client.redis_client import cache
 import asyncio
 import logging
@@ -14,13 +14,14 @@ router = APIRouter()
 @router.get("/s3/buckets", tags=["S3"])
 async def list_buckets(
         force_refresh: bool = False,
-        client_provider: AWSClientProvider = Depends(get_aws_client_provider)
+        client_provider: AWSClientProvider = Depends(get_aws_client_provider),
+        client_id: str = Depends(get_current_client_id_dependency)
 ):
     """
     List all S3 buckets names and regions.
     """
     try:
-        cache_key = "s3:buckets:list"
+        cache_key = f"s3:buckets:list:{client_id}"
         if not force_refresh and (cached := cache.get(cache_key)):
             return {**cached, "source": "cache"}
 
@@ -41,13 +42,14 @@ async def get_bucket_metrics(
         bucket_name: str = Query(..., description="Bucket name"),
         region: str = Query(..., description="Bucket region"),
         force_refresh: bool = False,
-        client_provider: AWSClientProvider = Depends(get_aws_client_provider)
+        client_provider: AWSClientProvider = Depends(get_aws_client_provider),
+        client_id: str = Depends(get_current_client_id_dependency)
 ):
     """
     Get metrics for ONE specific bucket.
     """
     try:
-        cache_key = f"s3:metrics:{bucket_name}:{region}"
+        cache_key = f"s3:metrics:{bucket_name}:{region}:{client_id}"
         if not force_refresh and (cached := cache.get(cache_key)):
             return {**cached, "source": "cache"}
 
@@ -66,7 +68,8 @@ async def get_bucket_metrics(
 @router.get("/s3/summary", tags=["S3"])
 async def get_s3_summary(
         force_refresh: bool = False,
-        client_provider: AWSClientProvider = Depends(get_aws_client_provider)
+        client_provider: AWSClientProvider = Depends(get_aws_client_provider),
+        client_id: str = Depends(get_current_client_id_dependency)
 ):
     """
     MASTER ENDPOINT:
@@ -75,7 +78,7 @@ async def get_s3_summary(
     3. Returns Top 10 Buckets AND Full List.
     """
     try:
-        cache_key = "s3:summary:dashboard"
+        cache_key = f"s3:summary:dashboard:{client_id}"
         if not force_refresh and (cached := cache.get(cache_key)):
             return {**cached, "source": "cache"}
 

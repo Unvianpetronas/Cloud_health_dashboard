@@ -1,6 +1,9 @@
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Any
+
+from botocore.exceptions import ClientError
+
 from .client import AWSClientProvider
 from .base_scanner import BaseAWSScanner
 import logging
@@ -38,15 +41,46 @@ class EC2Scanner(BaseAWSScanner):
         except Exception:
             return []
 
-    @BaseAWSScanner.with_retry()
     def scan_all_regions(self) -> Dict:
         """
         Hàm "Quản lý": Điều phối việc quét song song trên tất cả các khu vực.
         Đây là hàm chính mà bạn sẽ gọi từ bên ngoài.
         """
-        # 1. Lấy danh sách tất cả các khu vực có thể có
-        base_client = self.client_provider.get_client('ec2')
-        all_regions = [region['RegionName'] for region in base_client.describe_regions()['Regions']]
+        try:
+            # 1. Lấy danh sách tất cả các khu vực có thể có
+            base_client = self.client_provider.get_client('ec2')
+            all_regions = [region['RegionName'] for region in base_client.describe_regions()['Regions']]
+        except ClientError as e:
+            error_code = e.response.get('Error', {}).get('Code', '')
+            error_message = e.response.get('Error', {}).get('Message', '')
+
+            # Check if it's a permission error
+            if error_code == 'UnauthorizedOperation':
+                logger.warning(f"EC2 permission denied: {error_message}")
+                return {
+                    "error": "permission_denied",
+                    "error_code": "EC2_PERMISSION_DENIED",
+                    "service": "EC2",
+                    "message": "Your AWS account does not have permission to access EC2 service",
+                    "required_permissions": [
+                        "ec2:DescribeRegions",
+                        "ec2:DescribeInstances",
+                        "ec2:DescribeInstanceStatus"
+                    ],
+                    "instructions": "Please enable EC2 permissions in your AWS IAM policy to use this service",
+                    "total_instances_found": 0,
+                    "instances": [],
+                    "regions_scanned": 0,
+                    "has_instances": False
+                }
+
+            # Other ClientError
+            logger.error(f"EC2 ClientError: {error_code} - {error_message}")
+            raise
+
+        except Exception as e:
+            logger.error(f"Unexpected error in scan_all_regions: {e}", exc_info=True)
+            raise
 
         all_found_instances = []
 
