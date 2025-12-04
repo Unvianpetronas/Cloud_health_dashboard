@@ -134,7 +134,7 @@ const CostExplorer = () => {
   // 1. Cost Explorer Not Enabled UI
   if (!loading && !costExplorerEnabled) {
     return (
-        <div className="min-h-screen bg-cosmic-bg-0">
+        <div className="min-h-screen">
           <Header title="Cost Explorer" showNavigation={true} />
           <main className="container mx-auto px-6 py-8">
             <Card className="p-8 animate-fade-in max-w-4xl mx-auto">
@@ -194,7 +194,7 @@ const CostExplorer = () => {
   // 2. Loading State
   if (loading) {
     return (
-        <div className="min-h-screen bg-cosmic-bg-0">
+        <div className="min-h-screen">
           <Header title="Cost Explorer" showNavigation={true} />
           <main className="container mx-auto px-6 py-8 flex items-center justify-center min-h-96">
             <div className="text-center">
@@ -209,7 +209,7 @@ const CostExplorer = () => {
   // 3. Error State
   if (error) {
     return (
-        <div className="min-h-screen bg-cosmic-bg-0">
+        <div className="min-h-screen">
           <Header title="Cost Explorer" showNavigation={true} />
           <main className="container mx-auto px-6 py-8 flex items-center justify-center min-h-96">
             <Card className="p-8 text-center max-w-md animate-scale-in">
@@ -229,7 +229,7 @@ const CostExplorer = () => {
   const forecastData = getForecastData();
 
   return (
-      <div className="min-h-screen bg-cosmic-bg-0">
+      <div className="min-h-screen">
         <Header title="Cost Explorer" showNavigation={true} />
 
         {/* Updated Main Container to match Dashboard style */}
