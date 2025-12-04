@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from app.services.aws.client import AWSClientProvider
 from app.services.aws.securityhub import SecurityHubScanner
-from app.api.middleware.dependency import get_aws_client_provider
+from app.api.middleware.dependency import get_aws_client_provider,get_current_client_id_dependency
 from app.services.cache_client.redis_client import cache
 import asyncio
 import logging
@@ -13,14 +13,15 @@ router = APIRouter()
 @router.get("/securityhub/findings", tags=["SecurityHub"])
 async def get_securityhub_findings(
         force_refresh: bool = False,
-        client_provider: AWSClientProvider = Depends(get_aws_client_provider)
+        client_provider: AWSClientProvider = Depends(get_aws_client_provider),
+        client_id: str = Depends(get_current_client_id_dependency)
 ):
     """
     Quét tất cả findings từ AWS Security Hub trên toàn bộ regions có sẵn.
     Nếu dữ liệu đã được cache, sẽ trả về cache trừ khi `force_refresh=True`.
     """
     try:
-        cache_key = "securityhub:findings:all"
+        cache_key = f"securityhub:findings:all:{client_id}"
 
         if not force_refresh:
             if cached := cache.get(cache_key):

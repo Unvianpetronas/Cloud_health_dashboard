@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from app.database.models import ClientModel
-from app.api.middleware.dependency import get_current_client_id
+from app.api.middleware.dependency import get_current_client_id_dependency
 from datetime import datetime, timedelta
 from app.services.email.ses_client import SESEmailService
 import logging
@@ -23,7 +23,7 @@ class UpdateEmailRequest(BaseModel):
 @router.post("/email/send-verification", tags=["Email"])
 async def send_verification_email(
         request: SendVerificationRequest,
-        current_aws_account_id: str = Depends(get_current_client_id)
+        current_aws_account_id: str = Depends(get_current_client_id_dependency)
 ):
     """
     Send email verification to authenticated user
@@ -144,7 +144,7 @@ async def verify_email_token(token: str = Query(..., description="Email verifica
 
 @router.get("/email/verification-status", tags=["Email"])
 async def get_verification_status(
-        current_aws_account_id: str = Depends(get_current_client_id)
+        current_aws_account_id: str = Depends(get_current_client_id_dependency)
 ):
     """
     Check if authenticated user's email is verified
@@ -175,7 +175,7 @@ async def get_verification_status(
 @router.post("/email/resend-verification", tags=["Email"])
 async def resend_verification_email(
         request: SendVerificationRequest,
-        current_aws_account_id: str = Depends(get_current_client_id)
+        current_aws_account_id: str = Depends(get_current_client_id_dependency)
 ):
     """
     Resend verification email if previous one expired or was not received
@@ -247,7 +247,7 @@ async def resend_verification_email(
 @router.post("/email/notification", tags=["Email"])
 async def toggle_notification(
         request: NotificationToggleRequest,
-        current_aws_account_id: str = Depends(get_current_client_id)
+        current_aws_account_id: str = Depends(get_current_client_id_dependency)
 ):
     """
     Toggle email notifications on/off
@@ -290,7 +290,7 @@ async def toggle_notification(
 @router.put("/email/update", tags=["Email"])
 async def update_email(
         request: UpdateEmailRequest,
-        current_aws_account_id: str = Depends(get_current_client_id)
+        current_aws_account_id: str = Depends(get_current_client_id_dependency )
 ):
     """
     Update authenticated user's email

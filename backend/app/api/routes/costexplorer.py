@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from app.services.aws.client import AWSClientProvider
 from app.services.aws.costexplorer import CostExplorerScanner
-from app.api.middleware.dependency import get_aws_client_provider
+from app.api.middleware.dependency import *
 from app.services.cache_client.redis_client import cache
 import asyncio
 import logging
@@ -17,13 +17,14 @@ async def get_total_cost(
         end_date: str = Query(..., description="End date (YYYY-MM-DD)"),
         granularity: str = Query("MONTHLY", description="DAILY | MONTHLY | HOURLY"),
         force_refresh: bool = False,
-        client_provider: AWSClientProvider = Depends(get_aws_client_provider)
+        client_provider: AWSClientProvider = Depends(get_aws_client_provider),
+        client_id: str = Depends(get_current_client_id_dependency)
 ):
     """
     Get total AWS cost for a time period.
     """
     try:
-        cache_key = f"costexplorer:total:{start_date}:{end_date}:{granularity}"
+        cache_key = f"costexplorer:total:{start_date}:{end_date}:{granularity}:{client_id}"
         if not force_refresh:
             if cached := cache.get(cache_key):
                 logger.info("Returning cached total cost data")
@@ -51,13 +52,14 @@ async def get_cost_by_service(
         end_date: str = Query(...),
         granularity: str = "MONTHLY",
         force_refresh: bool = False,
-        client_provider: AWSClientProvider = Depends(get_aws_client_provider)
+        client_provider: AWSClientProvider = Depends(get_aws_client_provider),
+        client_id: str = Depends(get_current_client_id_dependency)
 ):
     """
     AWS cost breakdown by service.
     """
     try:
-        cache_key = f"costexplorer:by-service:{start_date}:{end_date}:{granularity}"
+        cache_key = f"costexplorer:by-service:{start_date}:{end_date}:{granularity}:{client_id}"
         if not force_refresh:
             if cached := cache.get(cache_key):
                 logger.info("Returning cached service cost data")
@@ -84,13 +86,14 @@ async def get_cost_by_account(
         end_date: str = Query(...),
         granularity: str = "MONTHLY",
         force_refresh: bool = False,
-        client_provider: AWSClientProvider = Depends(get_aws_client_provider)
+        client_provider: AWSClientProvider = Depends(get_aws_client_provider),
+        client_id: str = Depends(get_current_client_id_dependency)
 ):
     """
     AWS cost breakdown by account.
     """
     try:
-        cache_key = f"costexplorer:by-account:{start_date}:{end_date}:{granularity}"
+        cache_key = f"costexplorer:by-account:{start_date}:{end_date}:{granularity}:{client_id}"
         if not force_refresh:
             if cached := cache.get(cache_key):
                 logger.info("Returning cached account cost data")
@@ -116,13 +119,14 @@ async def get_cost_forecast(
         days_ahead: int = Query(30, description="Number of days to forecast ahead"),
         metric: str = "UNBLENDED_COST",
         force_refresh: bool = False,
-        client_provider: AWSClientProvider = Depends(get_aws_client_provider)
+        client_provider: AWSClientProvider = Depends(get_aws_client_provider),
+        client_id: str = Depends(get_current_client_id_dependency)
 ):
     """
     Forecast future costs.
     """
     try:
-        cache_key = f"costexplorer:forecast:{days_ahead}:{metric}"
+        cache_key = f"costexplorer:forecast:{days_ahead}:{metric}:{client_id}"
         if not force_refresh:
             if cached := cache.get(cache_key):
                 logger.info("Returning cached cost forecast")
@@ -147,13 +151,14 @@ async def get_cost_forecast(
 async def get_rightsizing_recommendations(
         service: str = Query("AmazonEC2", description="Service to get rightsizing recommendations for"),
         force_refresh: bool = False,
-        client_provider: AWSClientProvider = Depends(get_aws_client_provider)
+        client_provider: AWSClientProvider = Depends(get_aws_client_provider),
+        client_id: str = Depends(get_current_client_id_dependency)
 ):
     """
     Get rightsizing recommendations (e.g., EC2) for cost savings.
     """
     try:
-        cache_key = f"costexplorer:rightsizing:{service}"
+        cache_key = f"costexplorer:rightsizing:{service}:{client_id}"
         if not force_refresh:
             if cached := cache.get(cache_key):
                 logger.info("Returning cached rightsizing data")
@@ -180,7 +185,8 @@ async def get_cost_summary(
         granularity: str = "MONTHLY",
         forecast_days: int = 30,
         force_refresh: bool = False,
-        client_provider: AWSClientProvider = Depends(get_aws_client_provider)
+        client_provider: AWSClientProvider = Depends(get_aws_client_provider),
+        client_id: str = Depends(get_current_client_id_dependency)
 ):
     """
     Comprehensive cost summary: total cost, by service, by account, and forecast.
@@ -190,7 +196,7 @@ async def get_cost_summary(
         end_date = datetime.now(UTC).date().isoformat()
         start_date = (datetime.now(UTC) - timedelta(days=start_days_ago)).date().isoformat()
 
-        cache_key = f"costexplorer:summary:{start_date}:{end_date}:{granularity}:{forecast_days}"
+        cache_key = f"costexplorer:summary:{start_date}:{end_date}:{granularity}:{forecast_days}:{client_id}"
         if not force_refresh:
             if cache_data := cache.get(cache_key):
                 logger.info("Returning cached cost summary data")

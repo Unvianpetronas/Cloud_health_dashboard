@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from app.services.aws.client import AWSClientProvider
-from app.api.middleware.dependency import get_aws_client_provider
+from app.api.middleware.dependency import *
 from app.services.cache_client.redis_client import cache
 import logging
 
@@ -12,14 +12,15 @@ router = APIRouter()
 @router.get("/aws/billing", tags=["Free Tier"])
 async def get_billing_status(
         force_refresh: bool = False,
-        client_provider: AWSClientProvider = Depends(get_aws_client_provider)
+        client_provider: AWSClientProvider = Depends(get_aws_client_provider),
+        client_id: str = Depends(get_current_client_id_dependency)
 ):
     """
     Get Free Tier Usage information from AWS.
     Only returns services currently eligible for Free Tier.
     """
     try:
-        cache_key = "aws:billing:freetier"
+        cache_key = f"aws:billing:freetier:{client_id}"
         if not force_refresh and (cached := cache.get(cache_key)):
             return {**cached, "source": "cache"}
 

@@ -6,7 +6,7 @@ from app.services.aws.guardduty import GuardDutyScanner
 from app.services.aws.costexplorer import CostExplorerScanner
 from app.services.aws.cloudwatch import CloudWatchScanner
 from app.services.analytics.architecture_analyzer import ArchitectureAnalyzer
-from app.api.middleware.dependency import get_aws_client_provider, get_current_client_id
+from app.api.middleware.dependency import get_aws_client_provider, get_current_client_id_dependency
 from app.services.cache_client.redis_client import cache
 from app.database.dynamodb import DynamoDBConnection
 import asyncio
@@ -21,7 +21,7 @@ router = APIRouter()
 @router.get("/architecture/analyze", tags=["Architecture"])
 async def analyze_architecture(
     client_provider: AWSClientProvider = Depends(get_aws_client_provider),
-    client_id: str = Depends(get_current_client_id),
+    client_id: str = Depends(get_current_client_id_dependency),
     force_refresh: bool = Query(False, description="Force fresh data collection"),
     save_report: bool = Query(True, description="Save analysis report to database")
 ):
@@ -205,7 +205,7 @@ async def analyze_architecture(
 @router.get("/architecture/score", tags=["Architecture"])
 async def get_architecture_score(
     client_provider: AWSClientProvider = Depends(get_aws_client_provider),
-    client_id: str = Depends(get_current_client_id)
+    client_id: str = Depends(get_current_client_id_dependency)
 ):
     """
     Get quick architecture health score without full analysis.
@@ -251,7 +251,7 @@ async def get_architecture_score(
 @router.get("/architecture/recommendations", tags=["Architecture"])
 async def get_recommendations(
     client_provider: AWSClientProvider = Depends(get_aws_client_provider),
-    client_id: str = Depends(get_current_client_id),
+    client_id: str = Depends(get_current_client_id_dependency),
     priority: Optional[str] = Query(None, description="Filter by priority: CRITICAL, HIGH, MEDIUM, LOW")
 ):
     """
@@ -299,7 +299,7 @@ async def get_recommendations(
 @router.get("/architecture/cost-optimization", tags=["Architecture"])
 async def get_cost_optimization(
     client_provider: AWSClientProvider = Depends(get_aws_client_provider),
-    client_id: str = Depends(get_current_client_id)
+    client_id: str = Depends(get_current_client_id_dependency)
 ):
     """
     Get detailed cost optimization analysis and potential savings.
@@ -343,7 +343,7 @@ async def get_cost_optimization(
 @router.get("/architecture/well-architected", tags=["Architecture"])
 async def get_well_architected_scores(
     client_provider: AWSClientProvider = Depends(get_aws_client_provider),
-    client_id: str = Depends(get_current_client_id)
+    client_id: str = Depends(get_current_client_id_dependency)
 ):
     """
     Get AWS Well-Architected Framework pillar scores.

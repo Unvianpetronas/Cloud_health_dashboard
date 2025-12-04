@@ -73,7 +73,7 @@ async def get_aws_client_provider(token: str = Depends(oauth2_scheme)) -> AWSCli
         raise credentials_exception
 
 
-def get_current_client_id(token: str = Depends(oauth2_scheme)) -> str:
+def get_current_client_id_dependency(token: str = Depends(oauth2_scheme)) -> str:
     """
     New dependency - extracts aws_account_id from JWT
     Used for database operations and user identification
