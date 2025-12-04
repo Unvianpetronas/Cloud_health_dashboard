@@ -43,10 +43,10 @@ class ErrorBoundary extends React.Component {
               <Button 
                 onClick={this.handleRetry}
                 variant="primary"
-                className="w-full"
+                className="px-12 py-3 flex items-center justify-center"
               >
-                <RefreshCw size={16} />
-                Try Again
+                <RefreshCw size={16} className="mr-2" />
+                Retry
               </Button>
               
               <Button 
