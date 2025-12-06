@@ -20,7 +20,7 @@ from app.services.analytics.architecture_analyzer import ArchitectureAnalyzer
 from app.utils.jwt_handler import decode_refresh_token
 from app.config import settings
 import gc
-gc.collect()  # Force garbage collection after each cycle
+
 
 
 logger = logging.getLogger(__name__)
@@ -610,6 +610,7 @@ class CloudHealthWorker:
                 self.collect_architecture_analysis(),
                 return_exceptions=True  # Don't fail all if one fails
             )
+            gc.collect()  # Force garbage collection after each cycle
 
             # Update last collection timestamp
             await self.client_model.update_last_collection(self.aws_account_id)
