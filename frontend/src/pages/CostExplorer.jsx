@@ -15,19 +15,19 @@ const CostExplorer = () => {
   const [error, setError] = useState(null);
   const [costExplorerEnabled, setCostExplorerEnabled] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [timeRange, setTimeRange] = useState(30); // days
+  const TIME_RANGE = 30; // Fixed to 30 days
 
   useEffect(() => {
     if (isAuthenticated) {
       fetchCostData();
     }
-  }, [isAuthenticated, timeRange]);
+  }, [isAuthenticated]);
 
   const fetchCostData = async () => {
     setLoading(true);
     setError(null);
 
-    const result = await costExplorerApi.getSummary(timeRange, 'DAILY', 30, false);
+    const result = await costExplorerApi.getSummary(TIME_RANGE, 'DAILY', 30, false);
 
     if (result.success) {
       // Check if Cost Explorer is enabled
@@ -50,7 +50,7 @@ const CostExplorer = () => {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    const result = await costExplorerApi.getSummary(timeRange, 'DAILY', 30, true);
+    const result = await costExplorerApi.getSummary(TIME_RANGE, 'DAILY', 30, true);
 
     if (result.success) {
       if (result.data.enabled === false) {
@@ -134,7 +134,7 @@ const CostExplorer = () => {
   // 1. Cost Explorer Not Enabled UI
   if (!loading && !costExplorerEnabled) {
     return (
-        <div className="min-h-screen bg-cosmic-bg-0">
+        <div className="min-h-screen">
           <Header title="Cost Explorer" showNavigation={true} />
           <main className="container mx-auto px-6 py-8">
             <Card className="p-8 animate-fade-in max-w-4xl mx-auto">
@@ -194,7 +194,7 @@ const CostExplorer = () => {
   // 2. Loading State
   if (loading) {
     return (
-        <div className="min-h-screen bg-cosmic-bg-0">
+        <div className="min-h-screen">
           <Header title="Cost Explorer" showNavigation={true} />
           <main className="container mx-auto px-6 py-8 flex items-center justify-center min-h-96">
             <div className="text-center">
@@ -209,14 +209,17 @@ const CostExplorer = () => {
   // 3. Error State
   if (error) {
     return (
-        <div className="min-h-screen bg-cosmic-bg-0">
+        <div className="min-h-screen">
           <Header title="Cost Explorer" showNavigation={true} />
           <main className="container mx-auto px-6 py-8 flex items-center justify-center min-h-96">
             <Card className="p-8 text-center max-w-md animate-scale-in">
               <AlertCircle className="h-16 w-16 text-red-400 mx-auto mb-4" />
               <h2 className="text-2xl font-bold text-cosmic-txt-1 mb-2">Failed to Load Cost Data</h2>
               <p className="text-cosmic-txt-2 mb-4">{error}</p>
-              <Button onClick={fetchCostData} variant="primary">Retry</Button>
+              <Button onClick={fetchCostData} variant="primary" className="px-12 py-3 flex items-center justify-center mx-auto">
+                <RefreshCw size={16} className="mr-2" />
+                Retry
+              </Button>
             </Card>
           </main>
         </div>
@@ -229,7 +232,7 @@ const CostExplorer = () => {
   const forecastData = getForecastData();
 
   return (
-      <div className="min-h-screen bg-cosmic-bg-0">
+      <div className="min-h-screen">
         <Header title="Cost Explorer" showNavigation={true} />
 
         {/* Updated Main Container to match Dashboard style */}
@@ -242,36 +245,24 @@ const CostExplorer = () => {
               <p className="text-cosmic-txt-2">Analyze and optimize your AWS spending</p>
             </div>
 
-            <div className="flex items-center space-x-3 bg-cosmic-card p-2 rounded-xl border border-cosmic-border backdrop-blur-sm">
-              <select
-                  value={timeRange}
-                  onChange={(e) => setTimeRange(parseInt(e.target.value))}
-                  className="px-4 py-2 bg-cosmic-bg-2 border border-cosmic-border rounded-lg text-cosmic-txt-1 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              >
-                  <option value={7}>Last 7 days</option>
-                <option value={14}>Last 14 days</option>
-                <option value={30}>Last 30 days</option>
-                <option value={90}>Last 90 days</option>
-              </select>
-              <Button
-                  onClick={handleRefresh}
-                  disabled={refreshing}
-                  variant="primary"
-                  className="flex items-center space-x-2 text-sm py-2"
-              >
-                {refreshing ? (
-                    <>
-                      <div className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent"></div>
-                      <span>Refreshing</span>
-                    </>
-                ) : (
-                    <>
-                      <RefreshCw size={16} />
-                      <span>Refresh</span>
-                    </>
-                )}
-              </Button>
-            </div>
+            <Button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                variant="primary"
+                className="flex items-center space-x-2 text-sm py-2 px-4"
+            >
+              {refreshing ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                    <span>Refreshing</span>
+                  </>
+              ) : (
+                  <>
+                    <RefreshCw size={16} />
+                    <span>Refresh</span>
+                  </>
+              )}
+            </Button>
           </div>
 
           {/* Summary Cards */}
@@ -279,7 +270,7 @@ const CostExplorer = () => {
             <Card className="p-6 animate-slide-up">
               <div className="flex items-center justify-between mb-2">
                 <div>
-                  <div className="text-sm text-cosmic-txt-2 mb-1">Total Cost ({timeRange} days)</div>
+                  <div className="text-sm text-cosmic-txt-2 mb-1">Total Cost ({TIME_RANGE} days)</div>
                   <div className="text-3xl font-bold text-cosmic-txt-1">
                     {formatCurrency(getTotalCost())}
                   </div>

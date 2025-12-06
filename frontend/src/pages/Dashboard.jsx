@@ -315,7 +315,7 @@ const AWSCloudHealthDashboard = () => {
                             Error Loading Dashboard
                         </h3>
                         <p className="text-cosmic-txt-2 mb-6">{error}</p>
-                        <button onClick={handleRefresh} className="btn btn-primary">
+                        <button onClick={handleRefresh} className="btn btn-primary px-12 py-3 flex items-center justify-center mx-auto">
                             <RefreshCw size={16} className="mr-2" />
                             Retry
                         </button>

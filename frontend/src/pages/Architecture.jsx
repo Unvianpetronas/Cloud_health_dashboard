@@ -113,7 +113,8 @@ const Architecture = () => {
             <AlertTriangle className="h-16 w-16 text-red-400 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-cosmic-txt-1 mb-2">Analysis Error</h2>
             <p className="text-cosmic-txt-2 mb-4">{error}</p>
-            <Button onClick={fetchArchitectureData} variant="primary">
+            <Button onClick={fetchArchitectureData} variant="primary" className="px-12 py-3 flex items-center justify-center mx-auto">
+              <RefreshCw size={16} className="mr-2" />
               Retry
             </Button>
           </Card>
