@@ -12,7 +12,8 @@ const Home = () => {
     <div className="min-h-screen flex flex-col">
       <Header
         title="AWS Cloud Health Dashboard"
-        showNavigation={true}
+        accountId={user?.awsAccountId}
+        showNavigation={false}
       />
 
       <main className="flex-1">
@@ -55,21 +56,21 @@ const Home = () => {
         </section>
 
         {/* Developer Team Section */}
-        <section className="container mx-auto px-6 mt-[140px] sm:mt-[160px] pb-20 mb-20 lg:mb-28">
-          <div className="max-w-3xl mx-auto text-center space-y-3 mb-14">
-            <p className="text-xs uppercase tracking-[0.35em] text-cosmic-muted">
+        <section className="container mx-auto px-3 sm:px-6 mt-[100px] sm:mt-[140px] lg:mt-[160px] pb-12 sm:pb-20 mb-12 sm:mb-20 lg:mb-28">
+          <div className="max-w-3xl mx-auto text-center space-y-2 sm:space-y-3 mb-8 sm:mb-14">
+            <p className="text-xs uppercase tracking-[0.25em] sm:tracking-[0.35em] text-cosmic-muted">
               THE TEAM BEHIND THE DASHBOARD
             </p>
-            <h2 className="text-3xl sm:text-4xl font-bold text-cosmic-txt-1">
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-cosmic-txt-1">
               Meet the Developers
             </h2>
-            <p className="text-sm sm:text-base text-cosmic-txt-2 leading-relaxed">
+            <p className="text-sm sm:text-base text-cosmic-txt-2 leading-relaxed px-2">
               A small but passionate team of cloud enthusiasts and frontend engineers
               who designed and built this AWS Cloud Health experience.
             </p>
           </div>
 
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4 justify-items-center">
+          <div className="grid gap-4 sm:gap-8 sm:grid-cols-2 lg:grid-cols-4 justify-items-center">
             {[
               { name: 'Developer 1', role: 'Cloud / Backend Engineer / Project Manager', image: '/dev_pic1.jpg' },
               { name: 'Developer 2', role: 'Frontend / DevOps / Team Leader / Backend Engineer', image: '/dev_pic2.jpg' },
@@ -108,19 +109,19 @@ const Home = () => {
       </main>
 
       <footer className="border-t border-cosmic-border/40 bg-cosmic-bg-2/80 backdrop-blur-md">
-        <div className="container mx-auto px-6 py-8 sm:py-10">
-          <div className="flex flex-col gap-8 sm:flex-row sm:items-start sm:justify-between">
-            <div className="space-y-3 max-w-sm">
-              <h3 className="text-lg font-semibold text-cosmic-txt-1">
+        <div className="container mx-auto px-3 sm:px-6 py-6 sm:py-8 lg:py-10">
+          <div className="flex flex-col gap-6 sm:gap-8 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-2 sm:space-y-3 max-w-sm">
+              <h3 className="text-base sm:text-lg font-semibold text-cosmic-txt-1">
                 AWS Cloud Health Dashboard
               </h3>
-              <p className="text-sm text-cosmic-txt-2 leading-relaxed">
+              <p className="text-xs sm:text-sm text-cosmic-txt-2 leading-relaxed">
                 Monitor, optimize, and secure your AWS workloads with a modern,
                 cosmic-inspired observability experience.
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-8 text-sm">
+            <div className="flex flex-wrap gap-6 sm:gap-8 text-xs sm:text-sm">
               <div className="space-y-2">
                 <p className="text-xs font-semibold tracking-[0.25em] text-cosmic-muted uppercase">
                   Services

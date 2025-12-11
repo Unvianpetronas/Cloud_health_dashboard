@@ -409,11 +409,11 @@ const AWSCloudHealthDashboard = () => {
                 onTimeRangeChange={handleTimeRangeChange}
             />
 
-            <main className="container mx-auto px-6 py-8 space-y-6">
+            <main className="container mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-4 sm:space-y-6">
                 {/* Status Banner */}
-                <div className="mb-6 animate-fade-in">
+                <div className="mb-4 sm:mb-6 animate-fade-in">
                     <div className="flex items-center justify-center">
-                        <div className="inline-flex items-center space-x-3 text-sm text-cosmic-secondary bg-cosmic-card px-6 py-3 rounded-full border border-cosmic-border backdrop-blur-sm shadow-lg">
+                        <div className="inline-flex items-center flex-wrap justify-center gap-2 sm:gap-3 text-xs sm:text-sm text-cosmic-secondary bg-cosmic-card px-3 sm:px-6 py-2 sm:py-3 rounded-full border border-cosmic-border backdrop-blur-sm shadow-lg">
                             <div className={`w-2 h-2 rounded-full ${autoRefreshEnabled ? 'bg-green-400 animate-pulse' : 'bg-gray-400'}`}></div>
                             <span>Last updated: {lastUpdated ? lastUpdated.toLocaleTimeString() : 'Never'}</span>
                             <span className="text-cosmic-muted">•</span>
@@ -449,7 +449,7 @@ const AWSCloudHealthDashboard = () => {
                 <FreeTierBanner data={billingData} loading={billingLoading} />
 
                 {/* Top Section: Metrics Cards */}
-                <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+                <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-6">
                     {metricsData.map((metric, index) => (
                         <MetricsCard
                             key={index}
@@ -476,7 +476,7 @@ const AWSCloudHealthDashboard = () => {
                             </div>
                         ) : (
                             <>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mb-4">
                                     <div className="p-4 bg-cosmic-bg-2 rounded-xl border border-cosmic-border">
                                         <div className="flex items-center justify-between mb-2">
                                             <span className="text-sm text-cosmic-txt-2">Status</span>

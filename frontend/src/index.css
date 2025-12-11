@@ -386,6 +386,16 @@ section {
   padding: 0 1.5rem;
 }
 
+/* Scrollbar Hide Utility */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .hero {
@@ -398,6 +408,24 @@ section {
   
   section {
     padding: 40px 0;
+  }
+
+  .navbar {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .navbar--header {
+    padding: 0.75rem 1rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .navbar {
+    padding: 0.4rem 0.6rem;
+  }
+
+  .navbar--header {
+    padding: 0.6rem 0.8rem;
   }
 }
 

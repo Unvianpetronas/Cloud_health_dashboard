@@ -124,16 +124,25 @@ async def get_s3_summary(
         # Take Top 10
         top_10 = sorted_buckets[:10]
 
-        # Calculate Free Tier Usage (5GB Limit)
-        usage_percent = (total_storage_gb / 5.0) * 100
+        ft_check = False
+        ft_client = client_provider.get_client("freetier", region_name="us-east-1")
+        response = ft_client.get_free_tier_usage()
+
+        if response:
+            # Calculate Free Tier Usage (5GB Limit)
+            usage_percent = (total_storage_gb / 5.0) * 100
+            ft_check = True
+        else:
+            usage_percent = 0
+            ft_check = False
 
         data = {
             "total_buckets": len(buckets),
             "total_storage_gb": round(total_storage_gb, 4),
             "free_tier_usage_percent": round(usage_percent, 2),
             "top_10_buckets": top_10,
-            # FIXED: Added the full list of buckets here
-            "all_buckets_details": sorted_buckets
+            "all_buckets_details": sorted_buckets,
+            "free_tier_check": ft_check
         }
 
         cache.set(cache_key, data, ttl=600)
