@@ -146,12 +146,12 @@ const Architecture = () => {
     <div className="min-h-screen">
       <Header title="Architecture Analysis" showNavigation={true} />
 
-      <main className="p-6 max-w-7xl mx-auto space-y-6">
+      <main className="p-3 sm:p-6 max-w-7xl mx-auto space-y-4 sm:space-y-6">
         {/* Header Actions */}
-        <div className="flex justify-between items-center animate-fade-in">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 animate-fade-in">
           <div>
-            <h1 className="text-3xl font-bold text-cosmic-txt-1 mb-2">Architecture Health</h1>
-            <p className="text-cosmic-txt-2">
+            <h1 className="text-2xl sm:text-3xl font-bold text-cosmic-txt-1 mb-2">Architecture Health</h1>
+            <p className="text-sm sm:text-base text-cosmic-txt-2">
               Last analyzed: {data?.analysis_timestamp ? new Date(data.analysis_timestamp).toLocaleString() : 'Never'}
             </p>
           </div>
@@ -159,7 +159,7 @@ const Architecture = () => {
             onClick={handleRefresh}
             disabled={analyzing}
             variant="primary"
-            className="flex items-center space-x-2"
+            className="flex items-center space-x-2 w-full sm:w-auto justify-center"
           >
             {analyzing ? (
               <>
@@ -176,16 +176,16 @@ const Architecture = () => {
         </div>
 
         {/* Overall Score */}
-        <Card className="p-8 text-center animate-fade-in" style={{animationDelay: '0.1s'}}>
+        <Card className="p-4 sm:p-8 text-center animate-fade-in" style={{animationDelay: '0.1s'}}>
           <div className="mb-4">
-            <div className={`text-7xl font-bold bg-gradient-to-r ${getScoreGradient(data?.overall_score || 0)} bg-clip-text text-transparent`}>
+            <div className={`text-5xl sm:text-7xl font-bold bg-gradient-to-r ${getScoreGradient(data?.overall_score || 0)} bg-clip-text text-transparent`}>
               {data?.overall_score || 0}
             </div>
-            <div className="text-2xl font-semibold text-cosmic-txt-1 mt-2">
+            <div className="text-xl sm:text-2xl font-semibold text-cosmic-txt-1 mt-2">
               {data?.overall_rating || 'Unknown'}
             </div>
           </div>
-          <p className="text-cosmic-txt-2 max-w-2xl mx-auto">
+          <p className="text-sm sm:text-base text-cosmic-txt-2 max-w-2xl mx-auto px-2">
             Your AWS architecture has been analyzed against industry best practices and the AWS Well-Architected Framework.
           </p>
         </Card>
@@ -244,12 +244,12 @@ const Architecture = () => {
               <h2 className="text-xl font-semibold text-cosmic-txt-1">Recommendations ({filteredRecommendations.length})</h2>
             </div>
 
-            <div className="flex space-x-2">
+            <div className="flex flex-wrap gap-2">
               {['ALL', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map(priority => (
                 <button
                   key={priority}
                   onClick={() => setSelectedPriority(priority)}
-                  className={`px-3 py-1 rounded-lg text-sm font-semibold transition-all ${
+                  className={`px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
                     selectedPriority === priority
                       ? 'bg-blue-500 text-white'
                       : 'bg-cosmic-bg-2 text-cosmic-txt-2 hover:bg-cosmic-bg-1'

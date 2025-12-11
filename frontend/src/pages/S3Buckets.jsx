@@ -143,18 +143,18 @@ const S3Buckets = () => {
       <div className="min-h-screen">
         <Header title="S3 Buckets" showNavigation={true} />
 
-        <main className="p-6 max-w-7xl mx-auto space-y-6">
+        <main className="p-3 sm:p-6 max-w-7xl mx-auto space-y-4 sm:space-y-6">
           {/* Header */}
-          <div className="flex justify-between items-center animate-fade-in">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 animate-fade-in">
             <div>
-              <h1 className="text-3xl font-bold text-cosmic-txt-1 mb-2">S3 Storage Overview</h1>
-              <p className="text-cosmic-txt-2">Manage and monitor your S3 buckets across all regions</p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-cosmic-txt-1 mb-2">S3 Storage Overview</h1>
+              <p className="text-sm sm:text-base text-cosmic-txt-2">Manage and monitor your S3 buckets across all regions</p>
             </div>
             <Button
                 onClick={handleRefresh}
                 disabled={refreshing}
                 variant="primary"
-                className="flex items-center space-x-2"
+                className="flex items-center space-x-2 w-full sm:w-auto justify-center"
             >
               {refreshing ? (
                   <>
@@ -171,7 +171,7 @@ const S3Buckets = () => {
           </div>
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <Card className="p-6 animate-fade-in">
               <div className="flex items-center justify-between mb-2">
                 <Database className="h-8 w-8 text-blue-400" />
@@ -279,13 +279,13 @@ const S3Buckets = () => {
             <h2 className="text-xl font-semibold text-cosmic-txt-1 mb-4">All Buckets Details</h2>
 
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[600px]">
                 <thead>
                 <tr className="border-b border-cosmic-border">
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-cosmic-txt-1">Bucket Name</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-cosmic-txt-1">Region</th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-cosmic-txt-1">Size</th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-cosmic-txt-1">Objects</th>
+                  <th className="text-left py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm font-semibold text-cosmic-txt-1">Bucket Name</th>
+                  <th className="text-left py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm font-semibold text-cosmic-txt-1 hidden sm:table-cell">Region</th>
+                  <th className="text-right py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm font-semibold text-cosmic-txt-1">Size</th>
+                  <th className="text-right py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm font-semibold text-cosmic-txt-1 hidden md:table-cell">Objects</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -293,12 +293,12 @@ const S3Buckets = () => {
                 {data?.all_buckets_details && data.all_buckets_details.length > 0 ? (
                     data.all_buckets_details.map((bucket, index) => (
                         <tr key={index} className="border-b border-cosmic-border hover:bg-cosmic-bg-2 transition-colors">
-                          <td className="py-3 px-4 text-sm text-cosmic-txt-1 font-medium">{bucket.name}</td>
-                          <td className="py-3 px-4 text-sm text-cosmic-txt-2">{bucket.region}</td>
-                          <td className="py-3 px-4 text-sm text-cosmic-txt-2 text-right">
+                          <td className="py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm text-cosmic-txt-1 font-medium truncate max-w-[200px] sm:max-w-none">{bucket.name}</td>
+                          <td className="py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm text-cosmic-txt-2 hidden sm:table-cell">{bucket.region}</td>
+                          <td className="py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm text-cosmic-txt-2 text-right">
                             {formatGB(bucket.size_gb)}
                           </td>
-                          <td className="py-3 px-4 text-sm text-cosmic-txt-2 text-right">
+                          <td className="py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm text-cosmic-txt-2 text-right hidden md:table-cell">
                             {formatNumber(bucket.object_count)}
                           </td>
                         </tr>

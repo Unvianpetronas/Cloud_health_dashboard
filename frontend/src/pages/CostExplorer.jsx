@@ -236,20 +236,20 @@ const CostExplorer = () => {
         <Header title="Cost Explorer" showNavigation={true} />
 
         {/* Updated Main Container to match Dashboard style */}
-        <main className="container mx-auto px-6 py-8 space-y-6">
+        <main className="container mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-4 sm:space-y-6">
 
           {/* Title & Controls */}
-          <div className="flex flex-col md:flex-row justify-between items-center animate-fade-in">
-            <div className="mb-4 md:mb-0">
-              <h1 className="text-3xl font-bold text-cosmic-txt-1 mb-2">AWS Cost Explorer</h1>
-              <p className="text-cosmic-txt-2">Analyze and optimize your AWS spending</p>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 animate-fade-in">
+            <div className="mb-0">
+              <h1 className="text-2xl sm:text-3xl font-bold text-cosmic-txt-1 mb-2">AWS Cost Explorer</h1>
+              <p className="text-sm sm:text-base text-cosmic-txt-2">Analyze and optimize your AWS spending</p>
             </div>
 
             <Button
                 onClick={handleRefresh}
                 disabled={refreshing}
                 variant="primary"
-                className="flex items-center space-x-2 text-sm py-2 px-4"
+                className="flex items-center space-x-2 text-xs sm:text-sm py-2 px-3 sm:px-4 w-full sm:w-auto justify-center"
             >
               {refreshing ? (
                   <>
@@ -266,7 +266,7 @@ const CostExplorer = () => {
           </div>
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-6">
             <Card className="p-6 animate-slide-up">
               <div className="flex items-center justify-between mb-2">
                 <div>
@@ -437,12 +437,12 @@ const CostExplorer = () => {
                 <h2 className="text-lg font-semibold text-cosmic-txt-1 mb-4">Service Cost Breakdown</h2>
 
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full min-w-[400px]">
                     <thead>
                     <tr className="border-b border-cosmic-border">
-                      <th className="text-left py-3 px-4 text-xs font-semibold text-cosmic-muted uppercase tracking-wider">Service</th>
-                      <th className="text-right py-3 px-4 text-xs font-semibold text-cosmic-muted uppercase tracking-wider">Cost</th>
-                      <th className="text-right py-3 px-4 text-xs font-semibold text-cosmic-muted uppercase tracking-wider">Percentage</th>
+                      <th className="text-left py-2 sm:py-3 px-2 sm:px-4 text-xs font-semibold text-cosmic-muted uppercase tracking-wider">Service</th>
+                      <th className="text-right py-2 sm:py-3 px-2 sm:px-4 text-xs font-semibold text-cosmic-muted uppercase tracking-wider">Cost</th>
+                      <th className="text-right py-2 sm:py-3 px-2 sm:px-4 text-xs font-semibold text-cosmic-muted uppercase tracking-wider hidden sm:table-cell">Percentage</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -452,17 +452,17 @@ const CostExplorer = () => {
 
                       return (
                           <tr key={index} className="border-b border-cosmic-border/50 hover:bg-cosmic-bg-2 transition-colors">
-                            <td className="py-3 px-4 text-sm text-cosmic-txt-1 font-medium flex items-center space-x-3">
+                            <td className="py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm text-cosmic-txt-1 font-medium flex items-center space-x-2 sm:space-x-3">
                               <div
-                                  className="w-2.5 h-2.5 rounded-full shadow-sm"
+                                  className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full shadow-sm flex-shrink-0"
                                   style={{ backgroundColor: COLORS[index % COLORS.length] }}
                               ></div>
-                              <span>{service.name}</span>
+                              <span className="truncate">{service.name}</span>
                             </td>
-                            <td className="py-3 px-4 text-sm text-cosmic-txt-1 text-right font-bold">
+                            <td className="py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm text-cosmic-txt-1 text-right font-bold">
                               {formatCurrency(service.value)}
                             </td>
-                            <td className="py-3 px-4 text-sm text-cosmic-txt-2 text-right">
+                            <td className="py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm text-cosmic-txt-2 text-right hidden sm:table-cell">
                               {percentage.toFixed(1)}%
                             </td>
                           </tr>

@@ -41,27 +41,27 @@ const UserMenu = () => {
             {/* User Button */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center space-x-3 px-4 py-2 rounded-xl border border-cosmic-border bg-cosmic-card hover:bg-cosmic-bg-2 transition-all duration-200 backdrop-blur-cosmic group"
+                className="flex items-center space-x-2 sm:space-x-3 px-2 sm:px-4 py-1.5 sm:py-2 rounded-xl border border-cosmic-border bg-cosmic-card hover:bg-cosmic-bg-2 transition-all duration-200 backdrop-blur-cosmic group"
             >
-                <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-cosmic-glow">
-                    <User size={16} className="text-white" />
+                <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-cosmic-glow flex-shrink-0">
+                    <User size={14} className="sm:w-4 sm:h-4 w-3.5 h-3.5 text-white" />
                 </div>
                 <div className="text-left hidden sm:block">
-                    <p className="text-sm font-medium text-cosmic-txt-1">
+                    <p className="text-sm font-medium text-cosmic-txt-1 truncate max-w-[120px]">
                         {user?.accessKey || 'User'}
                     </p>
                     <p className="text-xs text-cosmic-txt-2">AWS Account</p>
                 </div>
                 <ChevronDown
-                    size={16}
-                    className={`text-cosmic-muted transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+                    size={14}
+                    className={`sm:w-4 sm:h-4 w-3.5 h-3.5 text-cosmic-muted transition-transform duration-200 flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`}
                 />
             </button>
 
             {/* Dropdown Menu */}
             {isOpen && (
                 <div
-                    className="user-menu-dropdown absolute right-0 top-full mt-4 w-64 card p-2 shadow-cosmic-glow-lg animate-scale-in z-50"
+                    className="user-menu-dropdown absolute right-0 top-full mt-2 sm:mt-4 w-56 sm:w-64 card p-2 shadow-cosmic-glow-lg animate-scale-in z-50"
                     style={{ animationDuration: '0.2s' }}
                 >
                     {/* User Info */}

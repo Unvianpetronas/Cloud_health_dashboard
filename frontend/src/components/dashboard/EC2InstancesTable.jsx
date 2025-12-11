@@ -96,34 +96,34 @@ const EC2InstancesTable = ({ instances = [], loading = false }) => {
 
             {/* Table */}
             <div className="overflow-x-auto rounded-lg border border-cosmic-border">
-                <table className="w-full">
+                <table className="w-full min-w-[800px]">
                     <thead className="bg-cosmic-bg-2">
                         <tr>
                             <th
-                                className="px-6 py-4 text-left text-xs font-medium text-cosmic-txt-2 uppercase tracking-wider cursor-pointer hover:text-cosmic-txt-1"
+                                className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-medium text-cosmic-txt-2 uppercase tracking-wider cursor-pointer hover:text-cosmic-txt-1"
                                 onClick={() => handleSort('InstanceId')}
                             >
                                 Instance
                             </th>
                             <th
-                                className="px-6 py-4 text-left text-xs font-medium text-cosmic-txt-2 uppercase tracking-wider cursor-pointer hover:text-cosmic-txt-1"
+                                className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-medium text-cosmic-txt-2 uppercase tracking-wider cursor-pointer hover:text-cosmic-txt-1 hidden sm:table-cell"
                                 onClick={() => handleSort('InstanceType')}
                             >
                                 Type
                             </th>
                             <th
-                                className="px-6 py-4 text-left text-xs font-medium text-cosmic-txt-2 uppercase tracking-wider cursor-pointer hover:text-cosmic-txt-1"
+                                className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-medium text-cosmic-txt-2 uppercase tracking-wider cursor-pointer hover:text-cosmic-txt-1"
                                 onClick={() => handleSort('State')}
                             >
                                 State
                             </th>
-                            <th className="px-6 py-4 text-left text-xs font-medium text-cosmic-txt-2 uppercase tracking-wider">
+                            <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-medium text-cosmic-txt-2 uppercase tracking-wider hidden md:table-cell">
                                 Region / AZ
                             </th>
-                            <th className="px-6 py-4 text-left text-xs font-medium text-cosmic-txt-2 uppercase tracking-wider">
+                            <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-medium text-cosmic-txt-2 uppercase tracking-wider hidden lg:table-cell">
                                 IP Address
                             </th>
-                            <th className="px-6 py-4 text-left text-xs font-medium text-cosmic-txt-2 uppercase tracking-wider">
+                            <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-medium text-cosmic-txt-2 uppercase tracking-wider">
                                 Actions
                             </th>
                         </tr>
@@ -139,33 +139,36 @@ const EC2InstancesTable = ({ instances = [], loading = false }) => {
                                     className="hover:bg-cosmic-bg-2 transition-colors cursor-pointer"
                                     onClick={() => setSelectedInstance(instance)}
                                 >
-                                    <td className="px-6 py-4">
+                                    <td className="px-3 sm:px-6 py-3 sm:py-4">
                                         <div className="flex flex-col">
-                                            <span className="text-sm font-medium text-cosmic-txt-1">
+                                            <span className="text-xs sm:text-sm font-medium text-cosmic-txt-1 truncate max-w-[150px] sm:max-w-none">
                                                 {instanceName}
                                             </span>
-                                            <span className="text-xs text-cosmic-txt-2 font-mono">
+                                            <span className="text-xs text-cosmic-txt-2 font-mono truncate max-w-[150px] sm:max-w-none">
                                                 {instance.InstanceId}
+                                            </span>
+                                            <span className="text-xs text-cosmic-txt-2 font-mono bg-cosmic-bg-2 px-2 py-0.5 rounded mt-1 sm:hidden">
+                                                {instance.InstanceType}
                                             </span>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4">
+                                    <td className="px-3 sm:px-6 py-3 sm:py-4 hidden sm:table-cell">
                                         <span className="text-sm text-cosmic-txt-1 font-mono bg-cosmic-bg-2 px-2 py-1 rounded">
                                             {instance.InstanceType}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4">
-                                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getStateColor(state)}`}>
+                                    <td className="px-3 sm:px-6 py-3 sm:py-4">
+                                        <span className={`inline-flex items-center px-2 sm:px-3 py-1 rounded-full text-xs font-medium border ${getStateColor(state)}`}>
                                             {state}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4">
+                                    <td className="px-3 sm:px-6 py-3 sm:py-4 hidden md:table-cell">
                                         <div className="flex flex-col text-sm">
                                             <span className="text-cosmic-txt-1">{instance.Region || instance.region || 'N/A'}</span>
                                             <span className="text-xs text-cosmic-txt-2">{instance.Placement?.AvailabilityZone || 'N/A'}</span>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4">
+                                    <td className="px-3 sm:px-6 py-3 sm:py-4 hidden lg:table-cell">
                                         <div className="flex flex-col text-xs">
                                             <span className="text-cosmic-txt-1 font-mono">
                                                 {instance.PublicIpAddress || instance.public_ip || '-'}
@@ -175,16 +178,16 @@ const EC2InstancesTable = ({ instances = [], loading = false }) => {
                                             </span>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4">
+                                    <td className="px-3 sm:px-6 py-3 sm:py-4">
                                         <button
-                                            className="text-blue-400 hover:text-blue-300 transition-colors text-sm flex items-center"
+                                            className="text-blue-400 hover:text-blue-300 transition-colors text-xs sm:text-sm flex items-center"
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 setSelectedInstance(instance);
                                             }}
                                         >
-                                            <ChevronRight className="w-4 h-4 mr-1" />
-                                            Details
+                                            <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1" />
+                                            <span className="hidden sm:inline">Details</span>
                                         </button>
                                     </td>
                                 </tr>
@@ -196,10 +199,10 @@ const EC2InstancesTable = ({ instances = [], loading = false }) => {
 
             {/* Detail Modal */}
             {selectedInstance && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-cosmic-card-bg border border-cosmic-border rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl animate-scale-in">
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+                    <div className="bg-cosmic-card-bg border border-cosmic-border rounded-xl sm:rounded-2xl max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto shadow-2xl animate-scale-in">
                         {/* Modal Header */}
-                        <div className="sticky top-0 bg-cosmic-bg-1 backdrop-blur-md border-b border-cosmic-border px-6 py-4 flex items-center justify-between z-10">
+                        <div className="sticky top-0 bg-cosmic-bg-1 backdrop-blur-md border-b border-cosmic-border px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between z-10">
                             <div className="flex items-center">
                                 <Server className="w-6 h-6 text-blue-400 mr-3" />
                                 <div>
@@ -220,7 +223,7 @@ const EC2InstancesTable = ({ instances = [], loading = false }) => {
                         </div>
 
                         {/* Modal Content */}
-                        <div className="p-6 space-y-6">
+                        <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
                             {/* Instance Information */}
                             <section>
                                 <h3 className="text-lg font-semibold text-cosmic-txt-1 mb-4 flex items-center">
@@ -313,7 +316,7 @@ const EC2InstancesTable = ({ instances = [], loading = false }) => {
                         </div>
 
                         {/* Modal Footer */}
-                        <div className="sticky bottom-0 bg-cosmic-card-bg border-t border-cosmic-border px-6 py-4 flex justify-end">
+                        <div className="sticky bottom-0 bg-cosmic-card-bg border-t border-cosmic-border px-3 sm:px-6 py-3 sm:py-4 flex justify-end">
                             <button
                                 onClick={() => setSelectedInstance(null)}
                                 className="px-6 py-2 bg-cosmic-blue hover:bg-cosmic-blue-light text-white rounded-lg transition-colors"

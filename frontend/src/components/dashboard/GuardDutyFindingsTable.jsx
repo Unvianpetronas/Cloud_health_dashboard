@@ -150,25 +150,25 @@ const GuardDutyFindingsTable = ({ findings = [], loading = false }) => {
 
             {/* Table */}
             <div className="overflow-x-auto rounded-lg border border-cosmic-border">
-                <table className="w-full">
+                <table className="w-full min-w-[800px]">
                     <thead className="bg-cosmic-bg-2">
                         <tr>
-                            <th className="px-6 py-4 text-left text-xs font-medium text-cosmic-txt-2 uppercase tracking-wider">
+                            <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-medium text-cosmic-txt-2 uppercase tracking-wider">
                                 Severity
                             </th>
-                            <th className="px-6 py-4 text-left text-xs font-medium text-cosmic-txt-2 uppercase tracking-wider">
+                            <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-medium text-cosmic-txt-2 uppercase tracking-wider">
                                 Finding
                             </th>
-                            <th className="px-6 py-4 text-left text-xs font-medium text-cosmic-txt-2 uppercase tracking-wider">
+                            <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-medium text-cosmic-txt-2 uppercase tracking-wider hidden md:table-cell">
                                 Resource
                             </th>
-                            <th className="px-6 py-4 text-left text-xs font-medium text-cosmic-txt-2 uppercase tracking-wider">
+                            <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-medium text-cosmic-txt-2 uppercase tracking-wider hidden lg:table-cell">
                                 Region
                             </th>
-                            <th className="px-6 py-4 text-left text-xs font-medium text-cosmic-txt-2 uppercase tracking-wider">
+                            <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-medium text-cosmic-txt-2 uppercase tracking-wider hidden lg:table-cell">
                                 Last Seen
                             </th>
-                            <th className="px-6 py-4 text-left text-xs font-medium text-cosmic-txt-2 uppercase tracking-wider">
+                            <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-medium text-cosmic-txt-2 uppercase tracking-wider">
                                 Actions
                             </th>
                         </tr>
@@ -184,46 +184,50 @@ const GuardDutyFindingsTable = ({ findings = [], loading = false }) => {
                                     className="hover:bg-cosmic-bg-2 transition-colors cursor-pointer"
                                     onClick={() => setSelectedFinding(finding)}
                                 >
-                                    <td className="px-6 py-4">
-                                        <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border ${getSeverityColor(severity)}`}>
+                                    <td className="px-3 sm:px-6 py-3 sm:py-4">
+                                        <span className={`inline-flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-full text-xs font-medium border ${getSeverityColor(severity)}`}>
                                             {getSeverityIcon(severity)}
                                             {severity}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex flex-col max-w-md">
-                                            <span className="text-sm font-medium text-cosmic-txt-1 line-clamp-1">
+                                    <td className="px-3 sm:px-6 py-3 sm:py-4">
+                                        <div className="flex flex-col max-w-[200px] sm:max-w-md">
+                                            <span className="text-xs sm:text-sm font-medium text-cosmic-txt-1 line-clamp-1">
                                                 {finding.Title || finding.title || 'Unknown Finding'}
                                             </span>
                                             <span className="text-xs text-cosmic-txt-2 line-clamp-2 mt-1">
                                                 {finding.Description || finding.description || 'No description available'}
                                             </span>
+                                            <div className="flex flex-col mt-1 md:hidden">
+                                                <span className="text-xs text-cosmic-txt-1">{resource.type}</span>
+                                                <span className="text-xs text-cosmic-txt-2 font-mono truncate">{resource.id}</span>
+                                            </div>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4">
+                                    <td className="px-3 sm:px-6 py-3 sm:py-4 hidden md:table-cell">
                                         <div className="flex flex-col">
                                             <span className="text-sm text-cosmic-txt-1">{resource.type}</span>
                                             <span className="text-xs text-cosmic-txt-2 font-mono">{resource.id}</span>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4">
+                                    <td className="px-3 sm:px-6 py-3 sm:py-4 hidden lg:table-cell">
                                         <span className="text-sm text-cosmic-txt-1">{finding.Region || finding.region || 'N/A'}</span>
                                     </td>
-                                    <td className="px-6 py-4">
+                                    <td className="px-3 sm:px-6 py-3 sm:py-4 hidden lg:table-cell">
                                         <span className="text-xs text-cosmic-txt-2">
                                             {formatTimestamp(finding.UpdatedAt || finding.CreatedAt || finding.timestamp)}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4">
+                                    <td className="px-3 sm:px-6 py-3 sm:py-4">
                                         <button
-                                            className="text-blue-400 hover:text-blue-300 transition-colors text-sm flex items-center"
+                                            className="text-blue-400 hover:text-blue-300 transition-colors text-xs sm:text-sm flex items-center"
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 setSelectedFinding(finding);
                                             }}
                                         >
-                                            <ChevronRight className="w-4 h-4 mr-1" />
-                                            Details
+                                            <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1" />
+                                            <span className="hidden sm:inline">Details</span>
                                         </button>
                                     </td>
                                 </tr>
@@ -235,10 +239,10 @@ const GuardDutyFindingsTable = ({ findings = [], loading = false }) => {
 
             {/* Detail Modal */}
             {selectedFinding && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-cosmic-card-bg border border-cosmic-border rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl animate-scale-in">
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+                    <div className="bg-cosmic-card-bg border border-cosmic-border rounded-xl sm:rounded-2xl max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto shadow-2xl animate-scale-in">
                         {/* Modal Header */}
-                        <div className="sticky top-0 bg-cosmic-bg-1 backdrop-blur-md border-b border-cosmic-border px-6 py-4 flex items-center justify-between z-10">
+                        <div className="sticky top-0 bg-cosmic-bg-1 backdrop-blur-md border-b border-cosmic-border px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between z-10">
                             <div className="flex items-center">
                                 <div className={`p-2 rounded-lg ${getSeverityColor(selectedFinding.Severity || selectedFinding.severity)} mr-3`}>
                                     {getSeverityIcon(selectedFinding.Severity || selectedFinding.severity)}
@@ -261,7 +265,7 @@ const GuardDutyFindingsTable = ({ findings = [], loading = false }) => {
                         </div>
 
                         {/* Modal Content */}
-                        <div className="p-6 space-y-6">
+                        <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
                             {/* Finding Overview */}
                             <section>
                                 <h3 className="text-lg font-semibold text-cosmic-txt-1 mb-4 flex items-center">
@@ -377,7 +381,7 @@ const GuardDutyFindingsTable = ({ findings = [], loading = false }) => {
                         </div>
 
                         {/* Modal Footer */}
-                        <div className="sticky bottom-0 bg-cosmic-bg-1 backdrop-blur-md border-t border-cosmic-border px-6 py-4 flex justify-between items-center z-10">
+                        <div className="sticky bottom-0 bg-cosmic-bg-1 backdrop-blur-md border-t border-cosmic-border px-3 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row justify-between items-center gap-2 z-10">
                             <a
                                 href={`https://console.aws.amazon.com/guardduty/home?region=${selectedFinding.Region || 'us-east-1'}#/findings?search=id%3D${selectedFinding.Id}`}
                                 target="_blank"

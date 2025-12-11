@@ -189,7 +189,7 @@ const Settings = () => {
 
   if (loading) {
     return (
-        <div className="min-h-screen bg-cosmic-bg-0">
+        <div className="min-h-screen">
           <Header title="Settings" showNavigation={true} />
           <main className="p-6 max-w-4xl mx-auto">
             <div className="flex items-center justify-center h-96">
@@ -201,13 +201,13 @@ const Settings = () => {
   }
 
   return (
-      <div className="min-h-screen bg-cosmic-bg-0">
+      <div className="min-h-screen">
         <Header title="Settings" showNavigation={true} />
 
-        <main className="p-6 max-w-4xl mx-auto">
-          <div className="mb-8 animate-fade-in">
-            <h1 className="text-3xl font-bold text-cosmic-txt-1 mb-2">Settings</h1>
-            <p className="text-cosmic-txt-2">Manage your dashboard preferences and account settings</p>
+        <main className="p-3 sm:p-6 max-w-4xl mx-auto">
+          <div className="mb-6 sm:mb-8 animate-fade-in">
+            <h1 className="text-2xl sm:text-3xl font-bold text-cosmic-txt-1 mb-2">Settings</h1>
+            <p className="text-sm sm:text-base text-cosmic-txt-2">Manage your dashboard preferences and account settings</p>
           </div>
 
           {toast && (
