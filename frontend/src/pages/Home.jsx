@@ -12,7 +12,7 @@ const Home = () => {
     <div className="min-h-screen flex flex-col">
       <Header
         title="AWS Cloud Health Dashboard"
-        showNavigation={true}
+        showNavigation={false}
       />
 
       <main className="flex-1">
