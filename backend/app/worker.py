@@ -19,6 +19,9 @@ from app.services.aws.cloudwatch import CloudWatchScanner
 from app.services.analytics.architecture_analyzer import ArchitectureAnalyzer
 from app.utils.jwt_handler import decode_refresh_token
 from app.config import settings
+import gc
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -598,12 +601,16 @@ class CloudHealthWorker:
         logger.info("=" * 70)
 
         try:
-            await self.collect_ec2_metrics()
-            await self.collect_cost_data()
-            await self.collect_security_findings()
-            await self.collect_s3_metrics()
-            await self.collect_cloudwatch_metrics()
-            await self.collect_architecture_analysis()
+            await asyncio.gather(
+                self.collect_ec2_metrics(),
+                self.collect_cost_data(),
+                self.collect_security_findings(),
+                self.collect_s3_metrics(),
+                self.collect_cloudwatch_metrics(),
+                self.collect_architecture_analysis(),
+                return_exceptions=True  # Don't fail all if one fails
+            )
+            gc.collect()  # Force garbage collection after each cycle
 
             # Update last collection timestamp
             await self.client_model.update_last_collection(self.aws_account_id)

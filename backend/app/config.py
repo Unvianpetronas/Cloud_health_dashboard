@@ -61,7 +61,7 @@ class BaseConfig(BaseSettings):
 
     # Multi-Tenant Settings
     MAX_CLIENTS_PER_INSTANCE: int = 50
-    WORKER_COLLECTION_INTERVAL: int = 600  # 10 minutes
+    WORKER_COLLECTION_INTERVAL: int = 43200  # 12 hours
     WORKER_COLLECTION_STAGGER_SECONDS: int = 10  # Delay between clients
 
     # Business Logic
