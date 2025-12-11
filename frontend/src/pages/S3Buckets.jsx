@@ -88,7 +88,7 @@ const S3Buckets = () => {
     return Object.entries(regions).map(([name, value]) => ({ name, value }));
   };
 
-  // 2. Top 10 Storage (Already provided by Backend!)
+  // 2. Top 10 Storage
   const getStorageByBucket = () => {
     const top10 = data?.top_10_buckets || [];
     return top10.map(b => ({
@@ -137,6 +137,7 @@ const S3Buckets = () => {
 
   // Calculate usage color
   const usagePercent = data?.free_tier_usage_percent || 0;
+  const free_tier_check = data?.free_tier_check || false
   const usageColor = usagePercent > 100 ? 'text-red-500' : usagePercent > 80 ? 'text-yellow-400' : 'text-green-400';
 
   return (
@@ -193,21 +194,23 @@ const S3Buckets = () => {
               </div>
             </Card>
 
-            <Card className="p-6 animate-fade-in" style={{animationDelay: '0.2s'}}>
-              <div className="flex items-center justify-between mb-2">
-                {usagePercent > 100 ? (
-                    <AlertTriangle className="h-8 w-8 text-red-500" />
-                ) : (
-                    <Shield className="h-8 w-8 text-green-400" />
-                )}
-                <div className="text-right">
-                  <div className={`text-3xl font-bold ${usageColor}`}>
-                    {usagePercent.toFixed(1)}%
+            {free_tier_check && (
+              <Card className="p-6 animate-fade-in" style={{animationDelay: '0.2s'}}>
+                <div className="flex items-center justify-between mb-2">
+                  {usagePercent > 100 ? (
+                      <AlertTriangle className="h-8 w-8 text-red-500" />
+                  ) : (
+                      <Shield className="h-8 w-8 text-green-400" />
+                  )}
+                  <div className="text-right">
+                    <div className={`text-3xl font-bold ${usageColor}`}>
+                      {usagePercent.toFixed(1)}%
+                    </div>
+                    <div className="text-sm text-cosmic-txt-2">Free Tier Used (5GB)</div>
                   </div>
-                  <div className="text-sm text-cosmic-txt-2">Free Tier Used (5GB)</div>
                 </div>
-              </div>
-            </Card>
+              </Card>
+             )}
 
             <Card className="p-6 animate-fade-in" style={{animationDelay: '0.3s'}}>
               <div className="flex items-center justify-between mb-2">

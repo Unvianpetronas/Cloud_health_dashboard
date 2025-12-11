@@ -7,6 +7,7 @@ const UserMenu = () => {
     const [isOpen, setIsOpen] = useState(false);
     const menuRef = useRef(null);
     const { user, logout } = useAuth();
+    console.log("User Object in Menu:", user);
     const navigate = useNavigate();
 
     // Close menu when clicking outside
@@ -48,7 +49,7 @@ const UserMenu = () => {
                 </div>
                 <div className="text-left hidden sm:block">
                     <p className="text-sm font-medium text-cosmic-txt-1 truncate max-w-[120px]">
-                        {user?.accessKey || 'User'}
+                        {user?.awsAccountId || 'User'}
                     </p>
                     <p className="text-xs text-cosmic-txt-2">AWS Account</p>
                 </div>
@@ -70,7 +71,7 @@ const UserMenu = () => {
                             Signed in as
                         </p>
                         <p className="text-xs text-cosmic-txt-2 truncate">
-                            {user?.accessKey || 'Unknown User'}
+                            {user?.awsAccountId || 'Unknown User'}
                         </p>
                         {user?.loginTime && (
                             <p className="text-xs text-cosmic-muted mt-1">

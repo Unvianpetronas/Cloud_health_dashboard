@@ -5,7 +5,7 @@ from app.services.aws.s3 import S3Scanner
 from app.services.aws.guardduty import GuardDutyScanner
 from app.services.aws.costexplorer import CostExplorerScanner
 from app.services.aws.cloudwatch import CloudWatchScanner
-from app.services.analytics.architecture_analyzer import ArchitectureAnalyzer
+from app.services.analytics.analyzer import ArchitectureAnalyzer
 from app.api.middleware.dependency import get_aws_client_provider, get_current_client_id_dependency
 from app.services.cache_client.redis_client import cache
 from app.database.dynamodb import DynamoDBConnection

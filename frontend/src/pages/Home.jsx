@@ -12,6 +12,7 @@ const Home = () => {
     <div className="min-h-screen flex flex-col">
       <Header
         title="AWS Cloud Health Dashboard"
+        accountId={user?.awsAccountId}
         showNavigation={false}
       />
 

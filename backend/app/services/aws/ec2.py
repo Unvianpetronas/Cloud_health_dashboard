@@ -51,12 +51,8 @@ class EC2Scanner(BaseAWSScanner):
             base_client = self.client_provider.get_client('ec2')
             all_regions = [region['RegionName'] for region in base_client.describe_regions()['Regions']]
         except ClientError as e:
-            error_code = e.response.get('Error', {}).get('Code', '')
-            error_message = e.response.get('Error', {}).get('Message', '')
-
             # Check if it's a permission error
-            if error_code == 'UnauthorizedOperation':
-                logger.warning(f"EC2 permission denied: {error_message}")
+                logger.warning(f"EC2 permission denied: {e}")
                 return {
                     "error": "permission_denied",
                     "error_code": "EC2_PERMISSION_DENIED",
@@ -73,11 +69,6 @@ class EC2Scanner(BaseAWSScanner):
                     "regions_scanned": 0,
                     "has_instances": False
                 }
-
-            # Other ClientError
-            logger.error(f"EC2 ClientError: {error_code} - {error_message}")
-            raise
-
         except Exception as e:
             logger.error(f"Unexpected error in scan_all_regions: {e}", exc_info=True)
             raise
