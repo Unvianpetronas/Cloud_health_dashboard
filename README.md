@@ -222,5 +222,3 @@ This project is part of a portfolio demonstration for job applications.
 For inquiries about this project or collaboration opportunities, please reach out through the deployed application or GitHub.
 
 ---
-
-**Note**: This project demonstrates production-grade DevSecOps practices while operating on a student budget, showcasing AWS expertise, cost optimization strategies, and scalable architecture design suitable for enterprise environments.
