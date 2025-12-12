@@ -204,21 +204,3 @@ cd frontend
 npm install
 npm start
 ```
-
-## 📝 API Documentation
-
-API documentation is available at `/docs` when running the application (FastAPI auto-generated Swagger UI).
-
-## 🤝 Contributing
-
-This is a portfolio project, but feedback and suggestions are welcome! Feel free to open issues for discussion.
-
-## 📄 License
-
-This project is part of a portfolio demonstration for job applications.
-
-## 📧 Contact
-
-For inquiries about this project or collaboration opportunities, please reach out through the deployed application or GitHub.
-
----
