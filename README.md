@@ -205,15 +205,6 @@ npm install
 npm start
 ```
 
-### Docker Deployment
-```bash
-# Development
-docker-compose -f docker-compose.dev.yml up
-
-# Production
-docker-compose -f docker-compose.prod.yml up -d
-```
-
 ## 📝 API Documentation
 
 API documentation is available at `/docs` when running the application (FastAPI auto-generated Swagger UI).
